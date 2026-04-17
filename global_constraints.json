@@ -248,12 +248,13 @@
     "original_path": "C:\\Users\\groessli\\Documents\\GitHub\\CHART_IDS_Experiment\\IDSD_Datasets\\UNSW_NB15_training-set(in).csv",
     "transformed_dataset": "UNSW_NB15_transformed.csv",
     "transformation_method": "Pre-Step schema mapping (Gap 6: IP→host mapping, column alignment, feature aggregation)",
+    "mapping_specification": "See dataset_mapping.json for explicit column-level mapping (UNSW 45 columns → IDS 21 columns); includes identity mappings, aggregations, generated columns, inferred columns, and dropped features",
     "usage": "Use TRANSFORMED dataset for all Steps 0-6; original UNSW is pre-processed in Pre-Step",
     "transformation_details": {
-      "maps_unsw_ips_to": "Deterministic hostnames (User0-4, Enterprise0-2, Defender, OpHost0-2, OpServer0, external_XXX)",
-      "aggregates_features": "sbytes + dbytes → bytes; spkts + dpkts → packets; infers service from dport",
-      "adds_network_context": "src_subnet, dst_subnet inferred from hostname mapping",
-      "preserves_feature_distributions": "All UNSW values kept; only new columns added (no interpolation)"
+      "maps_unsw_ips_to": "Deterministic hostnames (User0-4, Enterprise0-2, Defender, OpHost0-2, OpServer0, external_XXX) using MD5(IP + scenario_id) hash",
+      "aggregates_features": "sbytes + dbytes → bytes; spkts + dpkts → packets; infers service from dport and port-service lookup",
+      "adds_network_context": "src_subnet, dst_subnet inferred from hostname mapping; generates sport (ephemeral 1024-65535)",
+      "preserves_feature_distributions": "All UNSW values kept; only new columns added (no interpolation); Corr(bytes, packets) preserved ±5%"
     }
   }
 }

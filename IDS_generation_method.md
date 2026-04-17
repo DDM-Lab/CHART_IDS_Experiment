@@ -14,10 +14,13 @@
 
 **Objective:** Map UNSW-NB15 columns to output IDS schema, creating an intermediate CSV file for all downstream processing.
 
+**Key Reference:** See [dataset_mapping.json](dataset_mapping.json) for explicit column-level mapping specification, including identity mappings, aggregations, generated columns, inferred columns, and dropped features.
+
 **Inputs:**
 - UNSW-NB15 CSV (`UNSW_NB15_training-set(in).csv`)
 - Network topology definition
 - Output schema specification
+- [dataset_mapping.json](dataset_mapping.json) — Mapping strategy documentation
 
 **Outputs:**
 - `UNSW_NB15_transformed.csv` — Aligned dataset with output columns pre-populated where possible
@@ -808,6 +811,7 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
 ## **Key References**
 
 - [UNSW-NB15 Dataset](IDSD_Datasets/UNSW_NB15_training-set(in).csv) — Original source data
+- [dataset_mapping.json](dataset_mapping.json) — **Explicit column-level mapping from UNSW-NB15 (45 columns) to IDS output schema (21 columns)** — START HERE to understand transformation strategy
 - [UNSW_NB15_transformed.csv](UNSW_NB15_transformed.csv) — Transformed output from Pre-Step (schema-aligned, ready for Steps 0-6)
 - [global_constraints.json](global_constraints.json) — Master constraints for all scenarios
 - [zero_day_templates.json](zero_day_templates.json) — Per-scenario metadata

@@ -1,0 +1,662 @@
+{
+  "schema_version": "1.0",
+  "title": "UNSW-NB15 to IDS Output Schema Mapping",
+  "description": "Explicit column-level mapping from UNSW-NB15 dataset (43 columns) to target IDS output schema (21 columns), including identity mappings, aggregations, generated/inferred columns, and dropped features.",
+  "last_updated": "2026-04-17",
+  
+  "unsw_schema": {
+    "description": "Original UNSW-NB15 dataset columns (45 total: 1 ID + 42 features + 2 labels)",
+    "columns": [
+      {
+        "id": 1,
+        "name": "id",
+        "type": "identifier",
+        "description": "Record ID",
+        "handling": "DROPPED"
+      },
+      {
+        "id": 2,
+        "name": "dur",
+        "type": "feature",
+        "description": "Flow duration in seconds",
+        "handling": "IDENTITY → duration"
+      },
+      {
+        "id": 3,
+        "name": "proto",
+        "type": "feature",
+        "description": "Protocol (tcp, udp, etc.)",
+        "handling": "IDENTITY → proto"
+      },
+      {
+        "id": 4,
+        "name": "service",
+        "type": "feature",
+        "description": "Service type (http, ssh, dns, ftp, etc.)",
+        "handling": "IDENTITY → service"
+      },
+      {
+        "id": 5,
+        "name": "state",
+        "type": "feature",
+        "description": "Connection state (FIN, CON, INT, etc.)",
+        "handling": "IDENTITY → state"
+      },
+      {
+        "id": 6,
+        "name": "spkts",
+        "type": "feature",
+        "description": "Source packets count",
+        "handling": "AGGREGATION → packets (spkts + dpkts)"
+      },
+      {
+        "id": 7,
+        "name": "dpkts",
+        "type": "feature",
+        "description": "Destination packets count",
+        "handling": "AGGREGATION → packets (spkts + dpkts)"
+      },
+      {
+        "id": 8,
+        "name": "sbytes",
+        "type": "feature",
+        "description": "Source bytes",
+        "handling": "AGGREGATION → bytes (sbytes + dbytes)"
+      },
+      {
+        "id": 9,
+        "name": "dbytes",
+        "type": "feature",
+        "description": "Destination bytes",
+        "handling": "AGGREGATION → bytes (sbytes + dbytes)"
+      },
+      {
+        "id": 10,
+        "name": "rate",
+        "type": "feature",
+        "description": "Flow rate (packets/sec)",
+        "handling": "DROPPED (derivable from packets and duration)"
+      },
+      {
+        "id": 11,
+        "name": "sttl",
+        "type": "feature",
+        "description": "Source TTL",
+        "handling": "IDENTITY → sttl"
+      },
+      {
+        "id": 12,
+        "name": "dttl",
+        "type": "feature",
+        "description": "Destination TTL",
+        "handling": "IDENTITY → dttl"
+      },
+      {
+        "id": 13,
+        "name": "sload",
+        "type": "feature",
+        "description": "Source load",
+        "handling": "DROPPED (derivable, higher-order)"
+      },
+      {
+        "id": 14,
+        "name": "dload",
+        "type": "feature",
+        "description": "Destination load",
+        "handling": "DROPPED (derivable, higher-order)"
+      },
+      {
+        "id": 15,
+        "name": "sloss",
+        "type": "feature",
+        "description": "Source packet loss count",
+        "handling": "IDENTITY → sloss"
+      },
+      {
+        "id": 16,
+        "name": "dloss",
+        "type": "feature",
+        "description": "Destination packet loss count",
+        "handling": "IDENTITY → dloss"
+      },
+      {
+        "id": 17,
+        "name": "sinpkt",
+        "type": "feature",
+        "description": "Source inter-packet time",
+        "handling": "DROPPED (derivable from packets and duration)"
+      },
+      {
+        "id": 18,
+        "name": "dinpkt",
+        "type": "feature",
+        "description": "Destination inter-packet time",
+        "handling": "DROPPED (derivable from packets and duration)"
+      },
+      {
+        "id": 19,
+        "name": "sjit",
+        "type": "feature",
+        "description": "Source jitter",
+        "handling": "DROPPED (higher-order statistic)"
+      },
+      {
+        "id": 20,
+        "name": "djit",
+        "type": "feature",
+        "description": "Destination jitter",
+        "handling": "DROPPED (higher-order statistic)"
+      },
+      {
+        "id": 21,
+        "name": "swin",
+        "type": "feature",
+        "description": "Source window size",
+        "handling": "DROPPED (protocol-specific, loses generality)"
+      },
+      {
+        "id": 22,
+        "name": "stcpb",
+        "type": "feature",
+        "description": "Source TCP base sequence number",
+        "handling": "DROPPED (protocol-specific, loses generality)"
+      },
+      {
+        "id": 23,
+        "name": "dtcpb",
+        "type": "feature",
+        "description": "Destination TCP base sequence number",
+        "handling": "DROPPED (protocol-specific, loses generality)"
+      },
+      {
+        "id": 24,
+        "name": "dwin",
+        "type": "feature",
+        "description": "Destination window size",
+        "handling": "DROPPED (protocol-specific, loses generality)"
+      },
+      {
+        "id": 25,
+        "name": "tcprtt",
+        "type": "feature",
+        "description": "TCP round-trip time",
+        "handling": "DROPPED (higher-order, protocol-specific)"
+      },
+      {
+        "id": 26,
+        "name": "synack",
+        "type": "feature",
+        "description": "SYN/ACK time",
+        "handling": "DROPPED (protocol-specific)"
+      },
+      {
+        "id": 27,
+        "name": "ackdat",
+        "type": "feature",
+        "description": "ACK/DATA time",
+        "handling": "DROPPED (protocol-specific)"
+      },
+      {
+        "id": 28,
+        "name": "smean",
+        "type": "feature",
+        "description": "Source mean packet size",
+        "handling": "DROPPED (derivable: sbytes/spkts)"
+      },
+      {
+        "id": 29,
+        "name": "dmean",
+        "type": "feature",
+        "description": "Destination mean packet size",
+        "handling": "DROPPED (derivable: dbytes/dpkts)"
+      },
+      {
+        "id": 30,
+        "name": "trans_depth",
+        "type": "feature",
+        "description": "Transaction depth",
+        "handling": "DROPPED (application-layer, high-order)"
+      },
+      {
+        "id": 31,
+        "name": "response_body_len",
+        "type": "feature",
+        "description": "Response body length",
+        "handling": "DROPPED (application-layer, high-order)"
+      },
+      {
+        "id": 32,
+        "name": "ct_srv_src",
+        "type": "feature",
+        "description": "Count connections to service from source",
+        "handling": "DROPPED (temporal context, hard to preserve in fixed window)"
+      },
+      {
+        "id": 33,
+        "name": "ct_state_ttl",
+        "type": "feature",
+        "description": "Count with same state/TTL",
+        "handling": "DROPPED (temporal context)"
+      },
+      {
+        "id": 34,
+        "name": "ct_dst_ltm",
+        "type": "feature",
+        "description": "Count connections to destination in last time interval",
+        "handling": "DROPPED (temporal context)"
+      },
+      {
+        "id": 35,
+        "name": "ct_src_dport_ltm",
+        "type": "feature",
+        "description": "Count source IPs to same dest port in last time interval",
+        "handling": "IDENTITY → ct_src_dport_ltm (contextual, preserved for anomaly detection)"
+      },
+      {
+        "id": 36,
+        "name": "ct_dst_sport_ltm",
+        "type": "feature",
+        "description": "Count with same dest sport in last time interval",
+        "handling": "DROPPED (temporal context)"
+      },
+      {
+        "id": 37,
+        "name": "ct_dst_src_ltm",
+        "type": "feature",
+        "description": "Count unique dest IPs from same source in last time interval",
+        "handling": "IDENTITY → ct_dst_src_ltm (contextual, preserved for anomaly detection)"
+      },
+      {
+        "id": 38,
+        "name": "is_ftp_login",
+        "type": "feature",
+        "description": "Is FTP login attempt",
+        "handling": "DROPPED (service-specific, low generality)"
+      },
+      {
+        "id": 39,
+        "name": "ct_ftp_cmd",
+        "type": "feature",
+        "description": "Count FTP commands",
+        "handling": "DROPPED (service-specific)"
+      },
+      {
+        "id": 40,
+        "name": "ct_flw_http_mthd",
+        "type": "feature",
+        "description": "Count HTTP methods",
+        "handling": "DROPPED (service-specific)"
+      },
+      {
+        "id": 41,
+        "name": "ct_src_ltm",
+        "type": "feature",
+        "description": "Count source IPs in last time interval",
+        "handling": "DROPPED (temporal context)"
+      },
+      {
+        "id": 42,
+        "name": "ct_srv_dst",
+        "type": "feature",
+        "description": "Count service connections from destination",
+        "handling": "DROPPED (temporal context)"
+      },
+      {
+        "id": 43,
+        "name": "is_sm_ips_ports",
+        "type": "feature",
+        "description": "Small IP/port set indicator",
+        "handling": "DROPPED (derived boolean, low information)"
+      },
+      {
+        "id": 44,
+        "name": "attack_cat",
+        "type": "label",
+        "description": "Attack category (Normal, Exploits, Worms, Backdoor, Shellcode)",
+        "handling": "IDENTITY → attack_cat"
+      },
+      {
+        "id": 45,
+        "name": "label",
+        "type": "label",
+        "description": "Binary label (0=Normal, 1=Attack)",
+        "handling": "IDENTITY → label (converted to Benign/Malicious/False Alarm in Step 6)"
+      }
+    ]
+  },
+  
+  "ids_schema": {
+    "description": "Target IDS output schema (21 columns required for NoDOZE alignment)",
+    "columns": [
+      {
+        "id": 1,
+        "name": "timestamp",
+        "type": "metadata",
+        "description": "Event timestamp in observation window (seconds)",
+        "constraints": "0 ≤ t ≤ 1800, strictly increasing",
+        "source": "GENERATED (synthetic, assigned in Step 6 based on temporal phase architecture)"
+      },
+      {
+        "id": 2,
+        "name": "src_host",
+        "type": "network",
+        "description": "Source hostname (must belong to defined topology)",
+        "constraints": "User0-4 | Enterprise0-2 | Defender | OpHost0-2 | OpServer0 | external_XXXX",
+        "source": "GENERATED (deterministic IP→hostname mapping using MD5(IP+scenario_id) hash in Pre-Step)"
+      },
+      {
+        "id": 3,
+        "name": "dst_host",
+        "type": "network",
+        "description": "Destination hostname (must belong to defined topology)",
+        "constraints": "User0-4 | Enterprise0-2 | Defender | OpHost0-2 | OpServer0 | external_XXXX",
+        "source": "GENERATED (deterministic IP→hostname mapping using MD5(IP+scenario_id) hash in Pre-Step)"
+      },
+      {
+        "id": 4,
+        "name": "src_subnet",
+        "type": "network",
+        "description": "Source subnet (inferred from src_host prefix)",
+        "constraints": "Subnet 1 (User) | Subnet 2 (Enterprise) | Subnet 3 (Operational) | External",
+        "source": "INFERRED (from src_host prefix in Pre-Step)"
+      },
+      {
+        "id": 5,
+        "name": "dst_subnet",
+        "type": "network",
+        "description": "Destination subnet (inferred from dst_host prefix)",
+        "constraints": "Subnet 1 (User) | Subnet 2 (Enterprise) | Subnet 3 (Operational) | External",
+        "source": "INFERRED (from dst_host prefix in Pre-Step)"
+      },
+      {
+        "id": 6,
+        "name": "proto",
+        "type": "feature",
+        "description": "Protocol",
+        "constraints": "tcp | udp | http",
+        "source": "UNSW proto (IDENTITY)"
+      },
+      {
+        "id": 7,
+        "name": "sport",
+        "type": "network",
+        "description": "Source port (ephemeral)",
+        "constraints": "1024-65535",
+        "source": "GENERATED (random ephemeral port; not in UNSW; assigned in Pre-Step)"
+      },
+      {
+        "id": 8,
+        "name": "dport",
+        "type": "network",
+        "description": "Destination port",
+        "constraints": "Scenario-specific; must align with service (80=http, 22=ssh, 53=dns, 21=ftp, 445=smb, etc.)",
+        "source": "GENERATED (inferred from UNSW service field using port-service lookup table in Pre-Step)"
+      },
+      {
+        "id": 9,
+        "name": "service",
+        "type": "feature",
+        "description": "Service type",
+        "constraints": "http | ftp | ssh | dns | smtp | smb | snmp | rdp | - ",
+        "source": "UNSW service (IDENTITY)"
+      },
+      {
+        "id": 10,
+        "name": "duration",
+        "type": "feature",
+        "description": "Flow duration in seconds",
+        "constraints": "> 0; feature-consistent with bytes, packets",
+        "source": "UNSW dur (IDENTITY)"
+      },
+      {
+        "id": 11,
+        "name": "bytes",
+        "type": "feature",
+        "description": "Total bytes transferred (bidirectional)",
+        "constraints": ">= 0; feature-consistent with duration, packets",
+        "source": "UNSW sbytes + dbytes (AGGREGATION)"
+      },
+      {
+        "id": 12,
+        "name": "packets",
+        "type": "feature",
+        "description": "Total packets transferred (bidirectional)",
+        "constraints": ">= 0; feature-consistent with duration, bytes",
+        "source": "UNSW spkts + dpkts (AGGREGATION)"
+      },
+      {
+        "id": 13,
+        "name": "sttl",
+        "type": "feature",
+        "description": "Source TTL",
+        "constraints": "0-254",
+        "source": "UNSW sttl (IDENTITY)"
+      },
+      {
+        "id": 14,
+        "name": "dttl",
+        "type": "feature",
+        "description": "Destination TTL",
+        "constraints": "0-254",
+        "source": "UNSW dttl (IDENTITY)"
+      },
+      {
+        "id": 15,
+        "name": "state",
+        "type": "feature",
+        "description": "Connection state",
+        "constraints": "FIN | CON | INT | REQ | RST | URP | FOU | FSRA",
+        "source": "UNSW state (IDENTITY)"
+      },
+      {
+        "id": 16,
+        "name": "sloss",
+        "type": "feature",
+        "description": "Source packet loss count",
+        "constraints": "0-28",
+        "source": "UNSW sloss (IDENTITY)"
+      },
+      {
+        "id": 17,
+        "name": "dloss",
+        "type": "feature",
+        "description": "Destination packet loss count",
+        "constraints": "0-27",
+        "source": "UNSW dloss (IDENTITY)"
+      },
+      {
+        "id": 18,
+        "name": "ct_src_dport_ltm",
+        "type": "feature",
+        "description": "Count source IPs to same dest port in last time interval (contextual for port scanning detection)",
+        "constraints": "1-43",
+        "source": "UNSW ct_src_dport_ltm (IDENTITY)"
+      },
+      {
+        "id": 19,
+        "name": "ct_dst_src_ltm",
+        "type": "feature",
+        "description": "Count unique dest IPs from same source in last time interval (contextual for lateral movement detection)",
+        "constraints": "1-40",
+        "source": "UNSW ct_dst_src_ltm (IDENTITY)"
+      },
+      {
+        "id": 20,
+        "name": "attack_cat",
+        "type": "label",
+        "description": "Attack category from UNSW classification",
+        "constraints": "Normal | Exploits | Worms | Backdoor | Shellcode",
+        "source": "UNSW attack_cat (IDENTITY)"
+      },
+      {
+        "id": 21,
+        "name": "label",
+        "type": "label",
+        "description": "IDS event classification",
+        "constraints": "Benign | Malicious | False Alarm",
+        "source": "GENERATED (derived from label distribution and synthesis strategy in Steps 3-6; not a direct UNSW mapping)"
+      }
+    ]
+  },
+  
+  "mapping_strategies": {
+    "IDENTITY": {
+      "description": "Direct pass-through: UNSW column value used unchanged in IDS output",
+      "examples": ["proto → proto", "service → service", "dur → duration", "sttl → sttl", "dttl → dttl", "state → state", "sloss → sloss", "dloss → dloss", "ct_src_dport_ltm → ct_src_dport_ltm", "ct_dst_src_ltm → ct_dst_src_ltm", "attack_cat → attack_cat"],
+      "total_columns": 11,
+      "rationale": "These features are directional-agnostic or already aggregated; no transformation needed"
+    },
+    "AGGREGATION": {
+      "description": "Combine directional UNSW columns into single aggregated feature",
+      "transformations": [
+        {
+          "unsw_sources": ["sbytes", "dbytes"],
+          "ids_target": "bytes",
+          "formula": "sbytes + dbytes",
+          "rationale": "IDS perspective is protocol-neutral; total bytes transferred matters more than directionality"
+        },
+        {
+          "unsw_sources": ["spkts", "dpkts"],
+          "ids_target": "packets",
+          "formula": "spkts + dpkts",
+          "rationale": "Total packet count is more relevant for IDS detection than directional split"
+        }
+      ],
+      "total_columns": 2,
+      "correlation_preservation": "Ensure Corr(bytes, packets) and Corr(bytes, duration) maintained within ±5% of original UNSW statistics"
+    },
+    "GENERATION": {
+      "description": "Synthetic creation: column values generated based on rules, not derived from UNSW data",
+      "columns": [
+        {
+          "ids_target": "timestamp",
+          "generation_rule": "Assigned in Step 6 using phase-based temporal architecture; strictly increasing in range [0, 1800]",
+          "source_data": "None (synthetic)",
+          "determinism": "Deterministic within scenario (same event always gets same timestamp offset relative to phase)"
+        },
+        {
+          "ids_target": "sport",
+          "generation_rule": "Random ephemeral port in range [1024, 65535]; one per event",
+          "source_data": "None (UNSW has no sport); random generator with scenario seed for reproducibility",
+          "determinism": "Pseudo-random (reproducible with same seed)"
+        }
+      ],
+      "total_columns": 2,
+      "rationale": "UNSW lacks network context (hostnames, ports); these must be generated to create realistic IDS flows"
+    },
+    "INFERENCE": {
+      "description": "Derived from other columns using deterministic rules",
+      "derivations": [
+        {
+          "ids_target": "src_host",
+          "inference_rule": "Deterministic IP→hostname mapping: MD5(UNSW_srcIP + scenario_name) hashed to one of 11 internal hosts (User0-4, Enterprise0-2, Defender, OpHost0-2, OpServer0) based on modulo; OR external_XXXX if hash suggests external source",
+          "inputs": "UNSW source IP (implicit, not in schema), scenario_name",
+          "rationale": "Same UNSW IP always maps to same hostname within scenario for determinism"
+        },
+        {
+          "ids_target": "dst_host",
+          "inference_rule": "Deterministic IP→hostname mapping: MD5(UNSW_dstIP + scenario_name) hashed to hostname pool",
+          "inputs": "UNSW destination IP (implicit), scenario_name",
+          "rationale": "Deterministic IP→host pairing"
+        },
+        {
+          "ids_target": "src_subnet",
+          "inference_rule": "Inferred from src_host prefix: User* → 'Subnet 1 (User)', Enterprise* → 'Subnet 2 (Enterprise)', OpHost* | OpServer* → 'Subnet 3 (Operational)', external* → 'External'",
+          "inputs": "src_host",
+          "rationale": "Hostnames encode subnet membership; mapping is deterministic"
+        },
+        {
+          "ids_target": "dst_subnet",
+          "inference_rule": "Inferred from dst_host prefix: same logic as src_subnet",
+          "inputs": "dst_host",
+          "rationale": "Hostnames encode subnet membership"
+        },
+        {
+          "ids_target": "dport",
+          "inference_rule": "Service-to-dport lookup: http→80, https→443, ftp→21, ssh→22, dns→53, smtp→25, smb→445, snmp→161, rdp→3389, telnet→23, etc. See port_service_mapping table below",
+          "inputs": "UNSW service field",
+          "rationale": "IDS requires explicit port information; UNSW service names can be mapped to standard ports"
+        }
+      ],
+      "total_columns": 4,
+      "rationale": "Derived deterministically from available UNSW data; no synthesis required"
+    },
+    "LABEL_TRANSFORMATION": {
+      "description": "Special case: UNSW binary label (0/1) transformed to categorical IDS label (Benign/Malicious/False Alarm)",
+      "transformation_rule": "Conversion happens in Steps 3-6: Step 3 generates malicious events (label='Malicious'), Step 4 generates benign events (label='Benign'), Step 5 generates false alarms (label='False Alarm'). Output label field is NOT a direct map from UNSW label; it's derived from synthesis strategy.",
+      "unsw_source": "label (0 or 1)",
+      "ids_target": "label (string categorical)",
+      "rationale": "UNSW distinguishes only Normal vs. Attack; IDS requires finer distinction (Benign vs. Malicious vs. False Alarm) based on scenario-specific synthesis decisions"
+    },
+    "DROPPED": {
+      "description": "Columns removed from IDS schema (not included in output)",
+      "reasons": [
+        "Derivable from other columns (rate = packets/duration)",
+        "Protocol-specific (window size, TCP sequence numbers, jitter, RTT)",
+        "Higher-order statistics (temporal context features, response body length)",
+        "Low generality (FTP-specific counters, HTTP method counts)",
+        "Temporal context that's hard to preserve (ct_srv_src, ct_dst_ltm)"
+      ],
+      "columns": ["id", "rate", "sload", "dload", "sinpkt", "dinpkt", "sjit", "djit", "swin", "stcpb", "dtcpb", "dwin", "tcprtt", "synack", "ackdat", "smean", "dmean", "trans_depth", "response_body_len", "ct_srv_src", "ct_state_ttl", "ct_dst_ltm", "ct_dst_sport_ltm", "is_ftp_login", "ct_ftp_cmd", "ct_flw_http_mthd", "ct_src_ltm", "ct_srv_dst", "is_sm_ips_ports"],
+      "total_columns": 30,
+      "rationale": "IDS schema prioritizes network-level, protocol-agnostic features; application-layer and TCP-specific details add noise without improved generality"
+    }
+  },
+  
+  "port_service_mapping": {
+    "description": "Standard port-to-service lookup used for dport inference in Pre-Step",
+    "mapping": {
+      "20": "ftp-data",
+      "21": "ftp",
+      "22": "ssh",
+      "23": "telnet",
+      "25": "smtp",
+      "53": "dns",
+      "70": "gopher",
+      "80": "http",
+      "88": "kerberos",
+      "110": "pop3",
+      "143": "imap",
+      "161": "snmp",
+      "194": "irc",
+      "220": "imap3",
+      "389": "ldap",
+      "443": "https",
+      "465": "smtps",
+      "587": "smtp",
+      "993": "imaps",
+      "995": "pop3s",
+      "1433": "mssql",
+      "3306": "mysql",
+      "3389": "rdp",
+      "5432": "postgresql",
+      "5984": "couchdb",
+      "6379": "redis",
+      "8080": "http-proxy",
+      "8443": "https-alt",
+      "-": "unknown"
+    }
+  },
+  
+  "summary": {
+    "unsw_total_columns": 45,
+    "ids_total_columns": 21,
+    "column_accounting": {
+      "identity_mappings": 11,
+      "aggregations": 2,
+      "generated_columns": 2,
+      "inferred_columns": 4,
+      "label_transformations": 1,
+      "dropped_columns": 30,
+      "total": "11 + 2 + 2 + 4 + 1 + 30 = 50 (45 UNSW + 5 net new accounting for aggregations)"
+    },
+    "key_insights": [
+      "11 of 21 IDS columns come directly from UNSW with no modification",
+      "2 aggregations handle directional data (sbytes/dbytes → bytes, spkts/dpkts → packets)",
+      "4 IDS columns are inferred from UNSW data using deterministic rules (subnet membership from hostname)",
+      "2 IDS columns (timestamp, sport) are synthetically generated; not derivable from UNSW",
+      "1 special transformation: UNSW binary label → IDS categorical label (determined in Steps 3-6, not Pre-Step)",
+      "30 UNSW columns dropped (primarily protocol-specific, high-order statistics, or temporal context)"
+    ]
+  }
+}

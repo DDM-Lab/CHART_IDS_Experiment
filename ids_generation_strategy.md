@@ -59,24 +59,31 @@ By transforming upfront, all downstream steps work with a standardized, ready-to
 
 2. **Schema specification:**
    - 23 columns (21 output + 2 internal): timestamp, src_host, dst_host, src_subnet, dst_subnet, proto, sport, dport, service, duration, bytes, packets, sttl, dttl, state, sloss, dloss, ct_src_dport_ltm, ct_dst_src_ltm, attack_cat, label, _unsw_row_id, scenario_name
+   - **For detailed column mapping (UNSW 45 columns → IDS 21 columns), see [dataset_mapping.json](dataset_mapping.json)**
    - Output columns (21): All network flow metadata plus 7 new columns from UNSW for NoDOZE alignment (TTL, state, loss, connection counts)
    - All rows from original UNSW dataset, replicated once per scenario (5× multiplicity) with scenario-specific IP-to-host mappings
 
 ### **Substeps**
+
+**Reference: [dataset_mapping.json](dataset_mapping.json) contains explicit mapping logic for all substeps below.**
 
 1. **Load UNSW dataset** into memory as tabular data structure
 2. **For each UNSW row and each scenario:**
    - Extract source IP, destination IP, protocol, ports, duration, bytes, packets, attack category
 3. **For each IP address:**
    - Determine IP range (User, Enterprise, Operational, or External)
-   - Apply deterministic mapping function (scenario-aware hash) to select hostname from pool
+   - Apply deterministic MD5(IP + scenario_name) hashing to select hostname from pool (see [dataset_mapping.json](dataset_mapping.json) → mapping_strategies.INFERENCE)
    - Infer subnet from hostname prefix
-4. **Aggregate directional features:**
-   - Sum sent bytes + received bytes → total bytes
+4. **Aggregate directional features (see [dataset_mapping.json](dataset_mapping.json) → mapping_strategies.AGGREGATION):**
+   - Sum sent bytes + received bytes → total bytes (preserving Corr(bytes, packets) ≤ ±5% of original)
    - Sum sent packets + received packets → total packets
-5. **Infer service from destination port** using standard port-service lookup table
-6. **Construct new row** with all output schema columns, leaving timestamp and label fields null (to be populated in later steps)
-7. **Write transformed dataset** to CSV with exact column ordering
+5. **Generate ephemeral source port:**
+   - Random sport ∈ [1024, 65535] per event (pseudo-random with scenario seed for reproducibility)
+6. **Infer destination port from service:**
+   - Use port-service lookup table (see [dataset_mapping.json](dataset_mapping.json) → port_service_mapping)
+   - Example: service='http' → dport=80, service='ssh' → dport=22
+7. **Construct new row** with all output schema columns, leaving timestamp and label fields null (to be populated in later steps)
+8. **Write transformed dataset** to CSV with exact column ordering
 
 ### **Validation Criteria (Sanity Checks)**
 
