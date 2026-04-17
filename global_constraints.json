@@ -199,6 +199,13 @@
       "duration",
       "bytes",
       "packets",
+      "sttl",
+      "dttl",
+      "state",
+      "sloss",
+      "dloss",
+      "ct_src_dport_ltm",
+      "ct_dst_src_ltm",
       "attack_cat",
       "label"
     ],
@@ -212,6 +219,13 @@
       "dport": "Scenario-specific (validated in feature_constraints)",
       "service": "Must align with dport (80→http, 22→ssh, 53→dns, 21→ftp, 445→smb, etc.)",
       "duration_bytes_packets": "Internally consistent; preserve UNSW correlations",
+      "sttl": "Source TTL (0-254); from UNSW direct pass-through",
+      "dttl": "Destination TTL (0-254); from UNSW direct pass-through",
+      "state": "Connection state (FIN, CON, INT, REQ, RST, URP, FOU, FSRA); from UNSW direct pass-through",
+      "sloss": "Source packet loss count; from UNSW direct pass-through",
+      "dloss": "Destination packet loss count; from UNSW direct pass-through",
+      "ct_src_dport_ltm": "Count of source IPs to same dest port in last time interval; from UNSW direct pass-through",
+      "ct_dst_src_ltm": "Count of unique dest IPs from same source in last time interval; from UNSW direct pass-through",
       "attack_cat": "UNSW categories: Normal | Exploits | Worms | Backdoor | Shellcode",
       "label": "Benign | Malicious | False Alarm (derived from label_distribution)"
     }

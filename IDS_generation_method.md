@@ -28,8 +28,9 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
 - UNSW has raw IPs; output needs hostnames + subnets
 - UNSW has directional bytes (sbytes, dbytes); output needs totals
 - UNSW lacks temporal/network context; output requires phase-based timing, host mapping
+- UNSW has 43 columns; output selects and renames 21 key columns for NoDOZE alignment
 
-**By transforming upfront**, all subsequent steps (0-6) work with a consistent, ready-to-use dataset.
+**By transforming upfront**, all subsequent steps (0-6) work with a consistent, ready-to-use dataset with 21 focused columns (vs. raw UNSW's 43).
 
 ### Pre-Step Action Items
 
@@ -92,9 +93,49 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
        return host, subnet
    ```
 
-3. **Create Row Transformation Function:**
+3. **Create Row Transformation Function (21-column output):**
 
    ```python
+   def transform_unsw_row(unsw_row, scenario_name):
+       """Transform single UNSW row to output schema (21 columns)."""
+       # Extract and map IPs to hosts
+       src_host, src_subnet = map_ip_to_host(unsw_row['srcip'], scenario_name)
+       dst_host, dst_subnet = map_ip_to_host(unsw_row['dstip'], scenario_name)
+       
+       # Aggregate directional metrics
+       bytes_total = unsw_row['sbytes'] + unsw_row['dbytes']
+       packets_total = unsw_row['spkts'] + unsw_row['dpkts']
+       
+       # Infer service from port
+       service = infer_service_from_port(unsw_row['dport'])
+       
+       # Output 21-column row
+       return {
+           'timestamp': None,  # Placeholder; assigned in Step 6
+           'src_host': src_host,
+           'dst_host': dst_host,
+           'src_subnet': src_subnet,
+           'dst_subnet': dst_subnet,
+           'proto': unsw_row['proto'],
+           'sport': unsw_row['sport'],
+           'dport': unsw_row['dport'],
+           'service': service,
+           'duration': unsw_row['dur'],
+           'bytes': bytes_total,
+           'packets': packets_total,
+           'sttl': unsw_row['sttl'],  # NEW: Source TTL
+           'dttl': unsw_row['dttl'],  # NEW: Destination TTL
+           'state': unsw_row['state'],  # NEW: Connection state
+           'sloss': unsw_row['sloss'],  # NEW: Source packet loss
+           'dloss': unsw_row['dloss'],  # NEW: Destination packet loss
+           'ct_src_dport_ltm': unsw_row['ct_src_dport_ltm'],  # NEW: Source-port scan count
+           'ct_dst_src_ltm': unsw_row['ct_dst_src_ltm'],  # NEW: Lateral movement count
+           'attack_cat': unsw_row['attack_cat'],
+           'label': None,  # Placeholder; assigned in Step 6
+           '_unsw_row_id': unsw_row['id'],
+           'scenario_name': scenario_name
+       }
+   
    def infer_service_from_port(dport):
        """Map destination port to service name."""
        port_map = {
@@ -103,40 +144,6 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
            445: 'smb', 3389: 'rdp',
        }
        return port_map.get(int(dport), '-')
-   
-   def transform_unsw_row(unsw_row, scenario_name):
-       """Transform single UNSW row to output schema."""
-       
-       src_ip = unsw_row.get('src_ip')
-       dst_ip = unsw_row.get('dst_ip')
-       
-       src_host, src_subnet = map_ip_to_host(src_ip, scenario_name)
-       dst_host, dst_subnet = map_ip_to_host(dst_ip, scenario_name)
-       
-       # Aggregate directional features
-       total_bytes = unsw_row.get('sbytes', 0) + unsw_row.get('dbytes', 0)
-       total_packets = unsw_row.get('spkts', 0) + unsw_row.get('dpkts', 0)
-       
-       transformed = {
-           'timestamp': None,  # Will be assigned in Step 6
-           'src_host': src_host,
-           'dst_host': dst_host,
-           'src_subnet': src_subnet,
-           'dst_subnet': dst_subnet,
-           'proto': unsw_row.get('proto', 'tcp'),
-           'sport': int(unsw_row.get('sprt', 0)),
-           'dport': int(unsw_row.get('dprt', 0)),
-           'service': infer_service_from_port(unsw_row.get('dprt', 0)),
-           'duration': float(unsw_row.get('dur', 0)),
-           'bytes': int(total_bytes),
-           'packets': int(total_packets),
-           'attack_cat': unsw_row.get('attack_cat', 'Normal'),
-           'label': None,  # Will be set by Step 3 logic
-           '_unsw_row_id': unsw_row.get('id'),  # For traceability
-           'scenario_name': scenario_name,  # Track which scenario this row belongs to
-       }
-       
-       return transformed
    ```
 
 4. **Batch Transform Full Dataset:**
@@ -740,6 +747,7 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
    columns_ordered = [
        'timestamp', 'src_host', 'dst_host', 'src_subnet', 'dst_subnet',
        'proto', 'sport', 'dport', 'service', 'duration', 'bytes', 'packets',
+       'sttl', 'dttl', 'state', 'sloss', 'dloss', 'ct_src_dport_ltm', 'ct_dst_src_ltm',
        'attack_cat', 'label'
    ]
    
@@ -769,6 +777,13 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
 | **duration** | float | Scenario-constrained; seconds | 0.85 |
 | **bytes** | int | Feature-consistent with duration/packets | 5000 |
 | **packets** | int | Feature-consistent with bytes/duration | 25 |
+| **sttl** | int | Source TTL, 0-254 | 64 |
+| **dttl** | int | Destination TTL, 0-254 | 64 |
+| **state** | string | Connection state: FIN \| CON \| INT \| RST \| FSRA | CON |
+| **sloss** | int | Source packet loss count, 0-28 | 0 |
+| **dloss** | int | Destination packet loss count, 0-27 | 0 |
+| **ct_src_dport_ltm** | int | Source-port scan count (last time monitored), 1-43 | 2 |
+| **ct_dst_src_ltm** | int | Destination-source lateral movement count, 1-40 | 1 |
 | **attack_cat** | string | UNSW category: Normal \| Exploits \| Worms \| Backdoor \| Shellcode | Worms |
 | **label** | string | Benign \| Malicious \| False Alarm | Malicious |
 

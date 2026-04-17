@@ -58,7 +58,8 @@ By transforming upfront, all downstream steps work with a standardized, ready-to
    - `UNSW_NB15_transformed.csv` — Schema-aligned dataset with new columns
 
 2. **Schema specification:**
-   - 16 columns: timestamp, src_host, dst_host, src_subnet, dst_subnet, proto, sport, dport, service, duration, bytes, packets, attack_cat, label, _unsw_row_id, scenario_name
+   - 23 columns (21 output + 2 internal): timestamp, src_host, dst_host, src_subnet, dst_subnet, proto, sport, dport, service, duration, bytes, packets, sttl, dttl, state, sloss, dloss, ct_src_dport_ltm, ct_dst_src_ltm, attack_cat, label, _unsw_row_id, scenario_name
+   - Output columns (21): All network flow metadata plus 7 new columns from UNSW for NoDOZE alignment (TTL, state, loss, connection counts)
    - All rows from original UNSW dataset, replicated once per scenario (5× multiplicity) with scenario-specific IP-to-host mappings
 
 ### **Substeps**
@@ -121,8 +122,8 @@ The generation pipeline must produce consistent, reproducible artifacts. Global 
    - Label distribution (percentages and event counts)
    - Network topology (subnet definitions, host lists, IP ranges)
    - Temporal structure (observation window duration)
-   - Output schema (14-column specification, required column ordering)
-   - Valid values for categorical fields (proto, service, attack_cat, label)
+   - Output schema (21-column specification, required column ordering including 7 new NoDOZE-aligned columns: sttl, dttl, state, sloss, dloss, ct_src_dport_ltm, ct_dst_src_ltm)
+   - Valid values for categorical fields (proto, service, attack_cat, label, state)
    - Default phase schedule (benign/attack/recovery temporal phases)
    - False alarm taxonomy (types and distribution)
 
@@ -521,7 +522,7 @@ Temporal ordering is crucial for attack sequence analysis. Events are assigned t
 
 2. **CSV specification:**
    - Exactly 30 rows (10-11 malicious + 15 benign + 5 false alarm)
-   - 14 columns in exact order: timestamp, src_host, dst_host, src_subnet, dst_subnet, proto, sport, dport, service, duration, bytes, packets, attack_cat, label
+   - 21 columns in exact order: timestamp, src_host, dst_host, src_subnet, dst_subnet, proto, sport, dport, service, duration, bytes, packets, sttl, dttl, state, sloss, dloss, ct_src_dport_ltm, ct_dst_src_ltm, attack_cat, label
    - Timestamps strictly increasing from 0 to ~1800 seconds
    - No missing values (all cells populated)
 
