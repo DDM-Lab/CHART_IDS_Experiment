@@ -26,6 +26,7 @@ import json
 import pandas as pd
 from pathlib import Path
 from helper_functions import load_templates, save_templates, SCENARIOS
+from fill_feature_constraints import fill_feature_constraints
 
 
 def compute_feature_stats(df, scenario_name):
@@ -286,6 +287,18 @@ def process_step_2(
         print(f"  ❌ {error_msg}")
         report_lines.append(f"\n❌ {error_msg}")
         errors.append(error_msg)
+    
+    # Populate feature_constraints from _step2_stats
+    try:
+        print(f"\nFilling feature_constraints from computed statistics...")
+        fill_feature_constraints(templates_path)
+        print("  OK - Feature constraints populated successfully")
+        report_lines.append("OK - Feature constraints populated from statistics")
+    except Exception as e:
+        error_msg = f"Failed to fill feature_constraints: {str(e)}"
+        print(f"  ⚠️  {error_msg}")
+        report_lines.append(f"⚠️  {error_msg}")
+        # Don't add to errors list - this is non-critical
     
     # Save report
     try:

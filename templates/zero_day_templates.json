@@ -32,11 +32,46 @@
         ]
       },
       "feature_constraints": {
-        "duration": null,
-        "bytes": null,
-        "packets": null,
-        "rate": null,
-        "dport": null,
+        "duration": {
+          "min": 0.0,
+          "max": 59.999046,
+          "median": 0.48692,
+          "_note": "seconds"
+        },
+        "bytes": {
+          "min": 60,
+          "max": 13027669,
+          "median": 1624,
+          "_note": "total bytes (sbytes + dbytes)"
+        },
+        "packets": {
+          "min": 1,
+          "max": 11068,
+          "median": 18,
+          "_note": "total packets (spkts + dpkts)"
+        },
+        "rate": {
+          "median_mbps": 0.026682,
+          "_note": "computed from median duration and bytes"
+        },
+        "dport": {
+          "unique_values": [
+            20,
+            21,
+            22,
+            25,
+            53,
+            68,
+            80,
+            110,
+            161,
+            194,
+            388,
+            443,
+            5000
+          ],
+          "_note": "destination ports observed in filtered UNSW data"
+        },
         "_notes": "To be populated in Step 2 via UNSW extraction and percentile analysis"
       },
       "temporal_architecture": {
@@ -460,11 +495,46 @@
         ]
       },
       "feature_constraints": {
-        "duration": null,
-        "bytes": null,
-        "packets": null,
-        "rate": null,
-        "dport": null,
+        "duration": {
+          "min": 0.0,
+          "max": 59.999046,
+          "median": 0.448546,
+          "_note": "seconds"
+        },
+        "bytes": {
+          "min": 60,
+          "max": 13027669,
+          "median": 1420,
+          "_note": "total bytes (sbytes + dbytes)"
+        },
+        "packets": {
+          "min": 1,
+          "max": 11068,
+          "median": 18,
+          "_note": "total packets (spkts + dpkts)"
+        },
+        "rate": {
+          "median_mbps": 0.025326,
+          "_note": "computed from median duration and bytes"
+        },
+        "dport": {
+          "unique_values": [
+            20,
+            21,
+            22,
+            25,
+            53,
+            68,
+            80,
+            110,
+            161,
+            194,
+            388,
+            443,
+            5000
+          ],
+          "_note": "destination ports observed in filtered UNSW data"
+        },
         "_notes": "To be populated in Step 2 via UNSW extraction and percentile analysis"
       },
       "temporal_architecture": {
@@ -887,11 +957,46 @@
         ]
       },
       "feature_constraints": {
-        "duration": null,
-        "bytes": null,
-        "packets": null,
-        "rate": null,
-        "dport": null,
+        "duration": {
+          "min": 0.0,
+          "max": 59.999046,
+          "median": 0.48654,
+          "_note": "seconds"
+        },
+        "bytes": {
+          "min": 60,
+          "max": 13027669,
+          "median": 1628,
+          "_note": "total bytes (sbytes + dbytes)"
+        },
+        "packets": {
+          "min": 1,
+          "max": 11068,
+          "median": 18,
+          "_note": "total packets (spkts + dpkts)"
+        },
+        "rate": {
+          "median_mbps": 0.026769,
+          "_note": "computed from median duration and bytes"
+        },
+        "dport": {
+          "unique_values": [
+            20,
+            21,
+            22,
+            25,
+            53,
+            68,
+            80,
+            110,
+            161,
+            194,
+            388,
+            443,
+            5000
+          ],
+          "_note": "destination ports observed in filtered UNSW data"
+        },
         "_notes": "To be populated in Step 2 via UNSW extraction and percentile analysis"
       },
       "temporal_architecture": {
@@ -1332,11 +1437,37 @@
         ]
       },
       "feature_constraints": {
-        "duration": null,
-        "bytes": null,
-        "packets": null,
-        "rate": null,
-        "dport": null,
+        "duration": {
+          "min": 0.0,
+          "max": 59.879597,
+          "median": 9e-06,
+          "_note": "seconds"
+        },
+        "bytes": {
+          "min": 60,
+          "max": 250214,
+          "median": 200,
+          "_note": "total bytes (sbytes + dbytes)"
+        },
+        "packets": {
+          "min": 1,
+          "max": 274,
+          "median": 2,
+          "_note": "total packets (spkts + dpkts)"
+        },
+        "rate": {
+          "median_mbps": 177.777778,
+          "_note": "computed from median duration and bytes"
+        },
+        "dport": {
+          "unique_values": [
+            21,
+            80,
+            194,
+            5000
+          ],
+          "_note": "destination ports observed in filtered UNSW data"
+        },
         "_notes": "To be populated in Step 2 via UNSW extraction and percentile analysis"
       },
       "temporal_architecture": {
@@ -1750,11 +1881,37 @@
         ]
       },
       "feature_constraints": {
-        "duration": null,
-        "bytes": null,
-        "packets": null,
-        "rate": null,
-        "dport": null,
+        "duration": {
+          "min": 0.0,
+          "max": 59.879597,
+          "median": 9e-06,
+          "_note": "seconds"
+        },
+        "bytes": {
+          "min": 60,
+          "max": 250214,
+          "median": 200,
+          "_note": "total bytes (sbytes + dbytes)"
+        },
+        "packets": {
+          "min": 1,
+          "max": 274,
+          "median": 2,
+          "_note": "total packets (spkts + dpkts)"
+        },
+        "rate": {
+          "median_mbps": 177.777778,
+          "_note": "computed from median duration and bytes"
+        },
+        "dport": {
+          "unique_values": [
+            21,
+            80,
+            194,
+            5000
+          ],
+          "_note": "destination ports observed in filtered UNSW data"
+        },
         "_notes": "To be populated in Step 2 via UNSW extraction and percentile analysis"
       },
       "temporal_architecture": {
