@@ -2,6 +2,11 @@
   "scenarios": [
     {
       "scenario_name": "WannaCry",
+      "malicious_count": 11,
+      "complexity": "complex",
+      "complexity_justification": "Ransomware worm with lateral movement (scanning + exploit + encryption on multiple systems)",
+      "max_false_alarm_pct": 0.64,
+      "max_false_alarm_pct_rationale": "With 11 malicious events out of 30 total, max FA = (30-11)/30 = 63%. Set to 0.64 for safety margin.",
       "attack_description": "A user in the enterprise downloads and executes a malicious file disguised as legitimate software. The malware establishes a foothold, scans the internal network for vulnerable hosts using SMB, exploits EternalBlue, and propagates laterally. Infected machines execute a payload that encrypts files and generates high-volume file operations across the network.",
       "entry_point": {
         "host": "User1",
@@ -1079,6 +1084,11 @@
     },
     {
       "scenario_name": "Data_Theft",
+      "malicious_count": 9,
+      "complexity": "medium",
+      "complexity_justification": "Insider threat with discovery + staging + exfiltration via FTP/SSH",
+      "max_false_alarm_pct": 0.70,
+      "max_false_alarm_pct_rationale": "With 9 malicious events out of 30 total, max FA = (30-9)/30 = 70%.",
       "attack_description": "An attacker gains access to an enterprise host and stages sensitive files for exfiltration. Files are aggregated and transferred internally, then exfiltrated to an external server using FTP or SSH-based protocols. The attack includes intermediate staging steps to obscure the origin of the data.",
       "entry_point": {
         "host": "Enterprise1",
@@ -2156,6 +2166,11 @@
     },
     {
       "scenario_name": "ShellShock",
+      "malicious_count": 9,
+      "complexity": "medium",
+      "complexity_justification": "Web exploitation with bash execution + data access + exfiltration",
+      "max_false_alarm_pct": 0.70,
+      "max_false_alarm_pct_rationale": "With 9 malicious events out of 30 total, max FA = (30-9)/30 = 70%.",
       "attack_description": "An attacker exploits a vulnerable web server by sending crafted HTTP requests that trigger the ShellShock vulnerability. This leads to arbitrary command execution via Bash, allowing the attacker to spawn shells, execute system commands, and potentially establish persistence or exfiltrate data.",
       "entry_point": {
         "host": "Enterprise2",
@@ -3259,6 +3274,11 @@
     },
     {
       "scenario_name": "Netcat_Backdoor",
+      "malicious_count": 7,
+      "complexity": "simple",
+      "complexity_justification": "Backdoor installation and testing, minimal network movement",
+      "max_false_alarm_pct": 0.77,
+      "max_false_alarm_pct_rationale": "With 7 malicious events out of 30 total, max FA = (30-7)/30 = 77%.",
       "attack_description": "An attacker installs and executes Netcat on a compromised host to open a backdoor listener on a high-numbered port. This allows persistent remote access and command execution. The attacker may subsequently download additional tools or pivot within the network.",
       "entry_point": {
         "host": "User2",
@@ -4317,6 +4337,11 @@
     },
     {
       "scenario_name": "passwd_gzip_scp",
+      "malicious_count": 7,
+      "complexity": "simple",
+      "complexity_justification": "Direct credential theft: access + compress + transfer (linear sequence)",
+      "max_false_alarm_pct": 0.77,
+      "max_false_alarm_pct_rationale": "With 7 malicious events out of 30 total, max FA = (30-7)/30 = 77%.",
       "attack_description": "An attacker accesses sensitive system files such as /etc/passwd, compresses them using gzip, and transfers them to a remote machine using SCP over SSH. This represents a stealthy data exfiltration workflow leveraging legitimate administrative tools.",
       "entry_point": {
         "host": "Enterprise2",
