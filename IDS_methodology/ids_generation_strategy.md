@@ -16,9 +16,9 @@ The methodology consists of **8 sequential steps** (Pre-Step + Steps 0-6), each 
 | Step | Purpose | Input Artifacts | Output Artifacts |
 |------|---------|-----------------|------------------|
 | **Pre-Step** | Transform UNSW dataset to output schema | UNSW-NB15 CSV | UNSW_NB15_transformed.csv |
-| **Step 0** | Define global constraints | Scenario descriptions | global_constraints.json |
-| **Step 1** | Structure scenario templates | global_constraints.json | Updated zero_day_templates.json |
-| **Step 2** | Extract UNSW statistics & classify tier | UNSW_NB15_transformed.csv + zero_day_templates.json | TIER classification + feature statistics |
+| **Step 0** | Define global constraints | Scenario descriptions | templates/global_constraints.json |
+| **Step 1** | Structure scenario templates | templates/global_constraints.json | Updated templates/zero_day_templates.json |
+| **Step 2** | Extract UNSW statistics & classify tier | ../UNSW_NB15_transformed.csv + templates/zero_day_templates.json | TIER classification + feature statistics |
 | **Step 3** | Generate malicious events | Filtered UNSW data + TIER classification | 10-11 malicious events per scenario |
 | **Step 4** | Generate benign events | Network topology rules | 15 benign events per scenario |
 | **Step 5** | Generate false alarm events | False alarm taxonomy | 4-5 false alarm events per scenario |
@@ -44,7 +44,7 @@ By transforming upfront, all downstream steps work with a standardized, ready-to
 ### **Inputs**
 
 1. **Data files:**
-   - `IDSD_Datasets/UNSW_NB15_training-set(in).csv` — Original UNSW-NB15 dataset
+   - `IDS_Datasets/UNSW_NB15_training-set(in).csv` — Original UNSW-NB15 dataset
 
 2. **Configuration (defined in methodology, not user input):**
    - IP-to-hostname mapping rules (IP ranges assigned to predefined host pools: User0-4, Enterprise0-2, Defender, OpHost0-2, OpServer0)
@@ -59,28 +59,28 @@ By transforming upfront, all downstream steps work with a standardized, ready-to
 
 2. **Schema specification:**
    - 23 columns (21 output + 2 internal): timestamp, src_host, dst_host, src_subnet, dst_subnet, proto, sport, dport, service, duration, bytes, packets, sttl, dttl, state, sloss, dloss, ct_src_dport_ltm, ct_dst_src_ltm, attack_cat, label, _unsw_row_id, scenario_name
-   - **For detailed column mapping (UNSW 45 columns → IDS 21 columns), see [dataset_mapping.json](dataset_mapping.json)**
+   - **For detailed column mapping (UNSW 45 columns → IDS 21 columns), see [dataset_mapping.json](../templates/dataset_mapping.json)**
    - Output columns (21): All network flow metadata plus 7 new columns from UNSW for NoDOZE alignment (TTL, state, loss, connection counts)
    - All rows from original UNSW dataset, replicated once per scenario (5× multiplicity) with scenario-specific IP-to-host mappings
 
 ### **Substeps**
 
-**Reference: [dataset_mapping.json](dataset_mapping.json) contains explicit mapping logic for all substeps below.**
+**Reference: [dataset_mapping.json](../templates/dataset_mapping.json) contains explicit mapping logic for all substeps below.**
 
 1. **Load UNSW dataset** into memory as tabular data structure
 2. **For each UNSW row and each scenario:**
    - Extract source IP, destination IP, protocol, ports, duration, bytes, packets, attack category
 3. **For each IP address:**
    - Determine IP range (User, Enterprise, Operational, or External)
-   - Apply deterministic MD5(IP + scenario_name) hashing to select hostname from pool (see [dataset_mapping.json](dataset_mapping.json) → mapping_strategies.INFERENCE)
+   - Apply deterministic MD5(IP + scenario_name) hashing to select hostname from pool (see [dataset_mapping.json](../templates/dataset_mapping.json) → mapping_strategies.INFERENCE)
    - Infer subnet from hostname prefix
-4. **Aggregate directional features (see [dataset_mapping.json](dataset_mapping.json) → mapping_strategies.AGGREGATION):**
+4. **Aggregate directional features (see [dataset_mapping.json](../templates/dataset_mapping.json) → mapping_strategies.AGGREGATION):**
    - Sum sent bytes + received bytes → total bytes (preserving Corr(bytes, packets) ≤ ±5% of original)
    - Sum sent packets + received packets → total packets
 5. **Generate ephemeral source port:**
    - Random sport ∈ [1024, 65535] per event (pseudo-random with scenario seed for reproducibility)
 6. **Infer destination port from service:**
-   - Use port-service lookup table (see [dataset_mapping.json](dataset_mapping.json) → port_service_mapping)
+   - Use port-service lookup table (see [dataset_mapping.json](../templates/dataset_mapping.json) → port_service_mapping)
    - Example: service='http' → dport=80, service='ssh' → dport=22
 7. **Construct new row** with all output schema columns, leaving timestamp and label fields null (to be populated in later steps)
 8. **Write transformed dataset** to CSV with exact column ordering
@@ -123,7 +123,7 @@ The generation pipeline must produce consistent, reproducible artifacts. Global 
 ### **Outputs**
 
 1. **Configuration file:**
-   - `global_constraints.json` — Structured JSON file documenting all constraints
+   - `templates/global_constraints.json` — Structured JSON file documenting all constraints
 
 2. **Content includes:**
    - Label distribution (percentages and event counts)
@@ -179,13 +179,13 @@ Scenario templates must capture both static metadata (unchanged throughout the p
 ### **Inputs**
 
 1. **Configuration files:**
-   - `global_constraints.json` (from Step 0)
-   - Existing `zero_day_templates.json` (five scenarios with attack descriptions, entry points, target assets, key behaviors, UNSW filtering rules)
+   - `templates/global_constraints.json` (from Step 0)
+   - Existing `templates/zero_day_templates.json` (five scenarios with attack descriptions, entry points, target assets, key behaviors, UNSW filtering rules)
 
 ### **Outputs**
 
 1. **Configuration file:**
-   - Updated `zero_day_templates.json` — Expanded with new fields
+   - Updated `templates/zero_day_templates.json` — Expanded with new fields
 
 2. **New fields added (initially null, to be populated in Steps 2-5):**
    - `expected_tier`: TIER classification (1 or 2) based on UNSW row count
@@ -230,17 +230,17 @@ The amount of available real attack data determines the synthesis strategy. Scen
 ### **Inputs**
 
 1. **Data files:**
-   - `UNSW_NB15_transformed.csv` (from Pre-Step)
+   - `../UNSW_NB15_transformed.csv` (from Pre-Step)
 
 2. **Configuration files:**
-   - `zero_day_templates.json` (with unsw_filtering rules per scenario)
-   - `global_constraints.json`
+   - `templates/zero_day_templates.json` (with unsw_filtering rules per scenario)
+   - `templates/global_constraints.json`
 
 ### **Outputs**
 
 1. **Output files/reporting:**
    - Printed or logged TIER classification and feature statistics for each scenario
-   - Updated `zero_day_templates.json` with:
+   - Updated `templates/zero_day_templates.json` with:
      - `expected_tier` field populated (1 or 2)
      - Feature statistics (informational; for research documentation)
      - Indication of data sufficiency per scenario
@@ -270,7 +270,7 @@ The amount of available real attack data determines the synthesis strategy. Scen
 
 5. **Document findings:**
    - Log TIER, row count, feature ranges
-   - Update zero_day_templates.json with expected_tier
+   - Update templates/zero_day_templates.json with expected_tier
 
 ### **Validation Criteria**
 
@@ -279,7 +279,7 @@ The amount of available real attack data determines the synthesis strategy. Scen
 - [ ] Filtered row counts are non-zero and consistent with filtering rules
 - [ ] Feature statistics show sensible ranges (e.g., duration > 0, bytes ≥ 0, packets ≥ 0)
 - [ ] TIER 1 scenarios have ≥10 UNSW rows; TIER 2 have 5-9 rows
-- [ ] zero_day_templates.json successfully updated with expected_tier
+- [ ] templates/zero_day_templates.json successfully updated with expected_tier
 - [ ] Attack category counts match UNSW filtering rules applied
 
 ---
@@ -300,7 +300,7 @@ Malicious events must exhibit feature distributions consistent with real attacks
    - Filtered UNSW rows (from Step 2) for current scenario
 
 2. **Configuration files:**
-   - `zero_day_templates.json` with:
+   - `templates/zero_day_templates.json` with:
      - TIER classification (1 or 2)
      - entry_point, target_asset (for ordering attack chain)
      - key_attack_behaviors (for validation)
@@ -373,7 +373,7 @@ Benign events provide baseline traffic context and increase realism. They are in
 ### **Inputs**
 
 1. **Configuration files:**
-   - `global_constraints.json` (network topology, valid services)
+   - `templates/global_constraints.json` (network topology, valid services)
    - Service templates (port → service, typical duration ranges, typical byte ranges)
 
 2. **Methodology parameters:**
@@ -442,8 +442,8 @@ False alarms form a critical category for IDS research. They represent the false
 ### **Inputs**
 
 1. **Configuration files:**
-   - `global_constraints.json` (network topology, false alarm taxonomy)
-   - `zero_day_templates.json` (false_alarm_distribution per scenario)
+   - `templates/global_constraints.json` (network topology, false alarm taxonomy)
+   - `templates/zero_day_templates.json` (false_alarm_distribution per scenario)
 
 2. **Methodology parameters:**
    - Type 1 (Unusual port + Benign service): (any dport outside typical range) + (benign service like DNS)
@@ -514,8 +514,8 @@ Temporal ordering is crucial for attack sequence analysis. Events are assigned t
    - 5 false alarm events
 
 2. **Configuration files:**
-   - `zero_day_templates.json` (temporal_architecture phases from Step 1)
-   - `global_constraints.json` (phase definitions)
+   - `templates/zero_day_templates.json` (temporal_architecture phases from Step 1)
+   - `templates/global_constraints.json` (phase definitions)
 
 3. **Methodology parameters:**
    - Phase schedule: benign_baseline (0-300s, 6 events), attack_phase_1 (300-600s, 3 events), attack_phase_2 (600-900s, 3 events), attack_phase_3 (900-1200s, 2 events), benign_recovery (1200-1800s, 9 events)
@@ -594,8 +594,8 @@ All intermediate artifacts from each step should be preserved (not deleted) to e
 
 **Intermediate artifacts to retain:**
 - `UNSW_NB15_transformed.csv` (from Pre-Step)
-- `global_constraints.json` (from Step 0)
-- Updated `zero_day_templates.json` (from Steps 1-2)
+- `templates/global_constraints.json` (from Step 0)
+- Updated `templates/zero_day_templates.json` (from Steps 1-2)
 - Log files or printed reports from Step 2 (TIER classifications, feature statistics)
 
 ### **Dependency Chain**
@@ -634,7 +634,7 @@ For journal submission, the following should be documented:
 - This document (ids_generation_strategy.md) serves as the methodological framework
 - Specify TIER classifications assigned to each scenario (from Step 2)
 - Report feature statistics per scenario (from Step 2)
-- Document UNSW filtering rules applied per scenario (from zero_day_templates.json)
+- Document UNSW filtering rules applied per scenario (from templates/zero_day_templates.json)
 - Specify any deviations from standard methodology (e.g., adjusted thresholds)
 
 ### **Supplementary Materials**
@@ -642,7 +642,7 @@ For journal submission, the following should be documented:
 - Intermediate data files and logs (Pre-Step→Step 2 outputs)
 - Sample 30-event CSV files (one per scenario)
 - Validation reports from each step
-- Configuration files (global_constraints.json, zero_day_templates.json) with comments
+- Configuration files (templates/global_constraints.json, templates/zero_day_templates.json) with comments
 
 ### **Reproducibility
 

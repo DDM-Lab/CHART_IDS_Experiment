@@ -4,7 +4,7 @@
 
 **Scope:** WannaCry, Data Theft (FTP/SSH), ShellShock, Netcat Backdoor, passwd-gzip-scp
 
-**UNSW-NB15 Dataset:** `C:\Users\groessli\Documents\GitHub\CHART_IDS_Experiment\IDSD_Datasets\UNSW_NB15_training-set(in).csv`
+**UNSW-NB15 Dataset:** `IDS_Datasets/UNSW_NB15_training-set(in).csv`
 
 **Principle:** UNSW rows are independent flow observations (not sequences). Use as feature templates + synthetic timestamping for realistic causal chains.
 
@@ -14,13 +14,13 @@
 
 **Objective:** Map UNSW-NB15 columns to output IDS schema, creating an intermediate CSV file for all downstream processing.
 
-**Key Reference:** See [dataset_mapping.json](dataset_mapping.json) for explicit column-level mapping specification, including identity mappings, aggregations, generated columns, inferred columns, and dropped features.
+**Key Reference:** See [dataset_mapping.json](../templates/dataset_mapping.json) for explicit column-level mapping specification, including identity mappings, aggregations, generated columns, inferred columns, and dropped features.
 
 **Inputs:**
-- UNSW-NB15 CSV (`UNSW_NB15_training-set(in).csv`)
+- UNSW-NB15 CSV (`IDS_Datasets/UNSW_NB15_training-set(in).csv`)
 - Network topology definition
 - Output schema specification
-- [dataset_mapping.json](dataset_mapping.json) — Mapping strategy documentation
+- [dataset_mapping.json](../templates/dataset_mapping.json) — Mapping strategy documentation
 
 **Outputs:**
 - `UNSW_NB15_transformed.csv` — Aligned dataset with output columns pre-populated where possible
@@ -199,7 +199,7 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
    ```python
    # Execute before any pipeline steps
    batch_transform_unsw(
-       input_csv_path="IDSD_Datasets/UNSW_NB15_training-set(in).csv",
+       input_csv_path="IDS_Datasets/UNSW_NB15_training-set(in).csv",
        output_csv_path="UNSW_NB15_transformed.csv"
    )
    ```
@@ -240,7 +240,7 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
 - Cyber attack domain knowledge
 
 **Outputs:**
-- `global_constraints.json` — Master constraints for all scenarios
+- `templates/global_constraints.json` — Master constraints for all scenarios
 
 ### Step 0 Action Items
 
@@ -255,12 +255,12 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
    - Temporal architecture (5 phases)
    - Validation checkpoints
 
-2. **Populate `global_constraints.json`** with:
+2. **Populate `templates/global_constraints.json`** with:
    - All constraints above in structured JSON format
    - Documentation strings explaining each constraint
    - References to remediation document sections
 
-3. **Validation:** Ensure `global_constraints.json` is parseable and references are consistent with remediation doc.
+3. **Validation:** Ensure `templates/global_constraints.json` is parseable and references are consistent with remediation doc.
 
 ---
 
@@ -269,11 +269,11 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
 **Objective:** Define per-scenario configuration with fields for both static metadata and analysis-derived data (to be populated in Step 2+).
 
 **Inputs:**
-- Current `zero_day_templates.json` (existing 5 scenarios)
-- `global_constraints.json`
+- Current `templates/zero_day_templates.json` (existing 5 scenarios)
+- `templates/global_constraints.json`
 
 **Outputs:**
-- Updated `zero_day_templates.json` with new fields (analysis-dependent fields left empty)
+- Updated `templates/zero_day_templates.json` with new fields (analysis-dependent fields left empty)
 
 ### Step 1 Action Items
 
@@ -331,14 +331,14 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
 
 **Inputs:**
 - `UNSW_NB15_transformed.csv` (output from Pre-Step; schema-aligned)
-- `zero_day_templates.json` (with unsw_filtering rules)
-- `global_constraints.json` (validation thresholds)
+- `templates/zero_day_templates.json` (with unsw_filtering rules)
+- `templates/global_constraints.json` (validation thresholds)
 
 **Outputs:**
 - Scenario-specific feature statistics
 - UNSW row counts (determines TIER)
 - Validation report
-- Updated `zero_day_templates.json` with feature_constraints, temporal_architecture scaffolding, false_alarm_distribution, expected_tier
+- Updated `templates/zero_day_templates.json` with feature_constraints, temporal_architecture scaffolding, false_alarm_distribution, expected_tier
 
 ### Step 2 Action Items
 
@@ -460,7 +460,7 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
      status: ✅ Ready for synthesis
    ```
 
-3. **Update `zero_day_templates.json`** with computed TIER:
+3. **Update `templates/zero_day_templates.json`** with computed TIER:
 
    a) **`expected_tier`** = computed TIER (1 or 2)
 
@@ -579,7 +579,7 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
 **Objective:** Create 4-5 locally anomalous but globally common events.
 
 **Inputs:**
-- False alarm distribution from `zero_day_templates.json` (simplified to 2 types)
+- False alarm distribution from `templates/zero_day_templates.json` (simplified to 2 types)
 - Network topology
 
 **Outputs:**
@@ -810,11 +810,11 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
 
 ## **Key References**
 
-- [UNSW-NB15 Dataset](IDSD_Datasets/UNSW_NB15_training-set(in).csv) — Original source data
-- [dataset_mapping.json](dataset_mapping.json) — **Explicit column-level mapping from UNSW-NB15 (45 columns) to IDS output schema (21 columns)** — START HERE to understand transformation strategy
-- [UNSW_NB15_transformed.csv](UNSW_NB15_transformed.csv) — Transformed output from Pre-Step (schema-aligned, ready for Steps 0-6)
-- [global_constraints.json](global_constraints.json) — Master constraints for all scenarios
-- [zero_day_templates.json](zero_day_templates.json) — Per-scenario metadata
+- [UNSW-NB15 Dataset](../IDS_Datasets/UNSW_NB15_training-set(in).csv) — Original source data
+- [dataset_mapping.json](../templates/dataset_mapping.json) — **Explicit column-level mapping from UNSW-NB15 (45 columns) to IDS output schema (21 columns)** — START HERE to understand transformation strategy
+- [UNSW_NB15_transformed.csv](../UNSW_NB15_transformed.csv) — Transformed output from Pre-Step (schema-aligned, ready for Steps 0-6)
+- [global_constraints.json](../templates/global_constraints.json) — Master constraints for all scenarios
+- [zero_day_templates.json](../templates/zero_day_templates.json) — Per-scenario metadata
 - [ids_pipeline_remediation.md](ids_pipeline_remediation.md) — Detailed gap analysis and remediation strategies (Gaps 1-6, with Gap 6 addressed in Pre-Step)
 
 ---
@@ -822,8 +822,8 @@ UNSW-NB15 and output IDS tables have misaligned schemas:
 ## **Simplified Pipeline Execution Order**
 
 1. ✅ **Pre-Step**: Transform UNSW → `UNSW_NB15_transformed.csv`
-2. ✅ **Step 0**: Define global constraints → `global_constraints.json` (manual JSON)
-3. ✅ **Step 1**: Update scenario templates → `zero_day_templates.json` (add TIER + phases)
+2. ✅ **Step 0**: Define global constraints → `templates/global_constraints.json` (manual JSON)
+3. ✅ **Step 1**: Update scenario templates → `templates/zero_day_templates.json` (add TIER + phases)
 4. ✅ **Step 2**: Extract UNSW stats & classify TIER (1 or 2 only)
 5. ✅ **Step 3**: Generate malicious events (TIER 1 or 2, no KDE)
 6. ✅ **Step 4**: Generate benign events (15 events)
@@ -905,8 +905,8 @@ This document now reflects a **pragmatic, simplified approach** to generating sy
 
 - Python 3.7+
 - pandas (`pip install pandas`)
-- Input CSV: `IDSD_Datasets/UNSW_NB15_training-set(in).csv`
-- JSON templates: `global_constraints.json` + `zero_day_templates.json`
+- Input CSV: `IDS_Datasets/UNSW_NB15_training-set(in).csv`
+- JSON templates: `templates/global_constraints.json` + `templates/zero_day_templates.json`
 
 ### **You Will Create:**
 
@@ -919,8 +919,8 @@ This document now reflects a **pragmatic, simplified approach** to generating sy
 6. **Step 6**: Assemble & output CSV (~130 lines)
 
 Plus manual setup:
-- **Step 0**: Create `global_constraints.json` (hand-written JSON, ~50 lines)
-- **Step 1**: Update `zero_day_templates.json` with TIER + phases (JSON edits, ~10 lines per scenario)
+- **Step 0**: Create `templates/global_constraints.json` (hand-written JSON, ~50 lines)
+- **Step 1**: Update `templates/zero_day_templates.json` with TIER + phases (JSON edits, ~10 lines per scenario)
 
 ### **Expected Output:**
 
