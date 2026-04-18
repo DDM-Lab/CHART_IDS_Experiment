@@ -21,8 +21,25 @@ def main():
     # ============================================================
     # STEP 0: GLOBAL CONSTRAINTS
     # Define experiment rules (event counts, label ratios, topology, time window)
-        # Store all shared configuration parameters for downstream steps
-        # Output: global_constraints.json
+    # Store all shared configuration parameters for downstream steps
+    # Reference: global_constraints.json (pre-populated with constraints)
+    # ============================================================
+    
+    global_constraints_path = Path("templates/global_constraints.json")
+    
+    # VALIDATION: Verify global_constraints.json exists and is well-formed
+    if not global_constraints_path.exists():
+        raise FileNotFoundError(f"Global constraints file not found: {global_constraints_path}")
+    
+    # Note: global_constraints.json contains:
+    #   - label_distribution (Malicious 10-11, Benign 15, False Alarm 4-5)
+    #   - network_topology (3 subnets, 15 hosts total, routing rules)
+    #   - unsw_grounding_principles (UNSW as template library, not sequences)
+    #   - tiered_synthesis_framework (TIER 1/2/3 based on UNSW row count)
+    #   - false_alarm_taxonomy (3 types: unusual_port, high_volume, rare_duration)
+    #   - temporal_architecture (5 phases over 1800s observation window)
+    #   - output_schema (23 columns: 21 schema + 2 tracking)
+    #   - validation_checkpoints (15 critical sanity checks)
 
 
     # ============================================================

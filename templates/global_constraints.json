@@ -186,7 +186,9 @@
   
   "output_schema": {
     "format": "CSV",
-    "columns": [
+    "total_columns": "23 (21 schema + 2 tracking)",
+    "description": "Output CSV structure for each scenario (30-event table); exact column order is CRITICAL for downstream NoDOZE alignment",
+    "schema_columns_21": [
       "timestamp",
       "src_host",
       "dst_host",
@@ -209,7 +211,14 @@
       "attack_cat",
       "label"
     ],
-    "column_ordering": "Exact order REQUIRED",
+    "tracking_columns_2": [
+      "_unsw_row_id",
+      "scenario_name"
+    ],
+    "all_columns_ordered": [
+      "timestamp", "src_host", "dst_host", "src_subnet", "dst_subnet", "proto", "sport", "dport", "service", "duration", "bytes", "packets", "sttl", "dttl", "state", "sloss", "dloss", "ct_src_dport_ltm", "ct_dst_src_ltm", "attack_cat", "label", "_unsw_row_id", "scenario_name"
+    ],
+    "column_ordering": "Exact order REQUIRED for all 23 columns",
     "constraints": {
       "timestamp": "Strictly increasing (0 ≤ t ≤ 1800 seconds)",
       "src_host_dst_host": "Must map to defined hosts in network topology",
@@ -232,14 +241,113 @@
   },
   
   "validation_checkpoints": {
-    "global_sanity_checks": [
-      "Exactly 30 events per scenario",
-      "Label proportions match distribution (±1-2% tolerance)",
-      "All hosts belong to defined network topology",
-      "All timestamps strictly increasing",
-      "Attack window is contiguous and coherent",
-      "False alarms NOT causally connected to malicious chain",
-      "Output schema matches exact column order"
+    "description": "Comprehensive sanity checks to validate each scenario's 30-event table",
+    "critical_checks": [
+      {
+        "check_id": 1,
+        "name": "Row count",
+        "description": "Exactly 30 events per scenario",
+        "condition": "len(df) == 30",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 2,
+        "name": "Label distribution",
+        "description": "Malicious 10-11, Benign 15, False Alarm 4-5 (±1 tolerance)",
+        "condition": "10 ≤ Malicious ≤ 11 AND Benign == 15 AND 4 ≤ FalseAlarm ≤ 5",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 3,
+        "name": "Timestamp ordering",
+        "description": "All timestamps strictly increasing (0 ≤ t ≤ 1800)",
+        "condition": "df['timestamp'].is_monotonic_increasing AND (0 ≤ df['timestamp'].min()) AND (df['timestamp'].max() ≤ 1800)",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 4,
+        "name": "Host validity",
+        "description": "All src_host and dst_host belong to defined topology",
+        "condition": "All hosts in {User0-4, Enterprise0-2, Defender, OpHost0-2, OpServer0, external_*}",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 5,
+        "name": "Subnet inference",
+        "description": "src_subnet and dst_subnet correctly inferred from hostname",
+        "condition": "map(hostname → subnet) matches topology mapping rules",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 6,
+        "name": "Service-port alignment",
+        "description": "Service matches expected port (80→http, 22→ssh, 53→dns, 21→ftp, 445→smb, etc.)",
+        "condition": "All (service, dport) pairs are valid",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 7,
+        "name": "Feature consistency",
+        "description": "bytes, packets, duration are internally consistent and non-negative",
+        "condition": "bytes ≥ 0 AND packets ≥ 0 AND duration ≥ 0.01",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 8,
+        "name": "TTL values",
+        "description": "sttl and dttl in valid range (0-254 per RFC)",
+        "condition": "0 ≤ sttl ≤ 254 AND 0 ≤ dttl ≤ 254",
+        "severity": "HIGH"
+      },
+      {
+        "check_id": 9,
+        "name": "Attack category validity",
+        "description": "attack_cat in {Normal, Exploits, Worms, Backdoor, Shellcode}",
+        "condition": "All attack_cat values from UNSW categories",
+        "severity": "HIGH"
+      },
+      {
+        "check_id": 10,
+        "name": "Label values validity",
+        "description": "label in {Benign, Malicious, False Alarm}",
+        "condition": "All label values are valid",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 11,
+        "name": "Attack coherence",
+        "description": "All malicious events cluster in ~900s window (contiguous progression)",
+        "condition": "(max(malicious_t) - min(malicious_t)) ≤ 1000s AND mean_gap_between_malicious ≤ 100s",
+        "severity": "HIGH"
+      },
+      {
+        "check_id": 12,
+        "name": "False alarm isolation",
+        "description": "False alarms NOT temporally adjacent or causally linked to malicious chain",
+        "condition": "False alarm events > 100s away from nearest malicious event",
+        "severity": "HIGH"
+      },
+      {
+        "check_id": 13,
+        "name": "Column order",
+        "description": "Exact 23-column order: schema (21) + tracking (2)",
+        "condition": "CSV columns == all_columns_ordered",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 14,
+        "name": "No null values",
+        "description": "No NaN or null values in critical columns",
+        "condition": "All critical columns (src_host, dst_host, etc.) have non-null values",
+        "severity": "CRITICAL"
+      },
+      {
+        "check_id": 15,
+        "name": "Tracking columns present",
+        "description": "_unsw_row_id and scenario_name columns are present and populated",
+        "condition": "Both tracking columns exist and scenario_name matches expected value",
+        "severity": "HIGH"
+      }
     ]
   },
   
