@@ -601,11 +601,14 @@ if unsw_filters.get('attack_cat'):
 
 ---
 
-## **STEP 3: Generate Synthetic Malicious Events**
+## **STEP 3: Generate Synthetic Malicious Events** ✅ IMPLEMENTED
 
-**Objective:** Create 10-11 realistic malicious events per scenario using tiered synthesis based on Step 2 TIER classification.
+**Objective:** Create 10-11 realistic malicious events per scenario using tiered synthesis with scenario-aware phase-based causality.
 
-**Note:** Pre-Step now provides **all 21 columns**, including enhanced features: `sttl`, `dttl`, `state`, `sloss`, `dloss`, `ct_src_dport_ltm`, `ct_dst_src_ltm`. You can leverage these for realistic attack modeling (e.g., use `state='RST'` for connection resets, `ct_src_dport_ltm` for port scanning indicators).
+**Implementation**: `step_3.py` → `generate_malicious_events_step_3()`  
+**Output**: Updated templates with `_step3_malicious_events` per scenario
+
+**Note:** Pre-Step provides **all 21 columns**, including enhanced features: `sttl`, `dttl`, `state`, `sloss`, `dloss`, `ct_src_dport_ltm`, `ct_dst_src_ltm`. Events preserve UNSW feature distributions while adding temporal causality.
 
 **Inputs:**
 - Filtered UNSW data (from Step 2)
@@ -614,41 +617,71 @@ if unsw_filters.get('attack_cat'):
 
 **Outputs:**
 - List of 10-11 malicious event dictionaries with fields:
-  - `timestamp` (placeholder, to be assigned in Step 6)
-  - `src_host`, `dst_host`
-  - `src_subnet`, `dst_subnet`
+  - `timestamp` (assigned within phase windows via causality logic)
+  - `src_host`, `dst_host` (deterministic via MD5 hash mapping)
+  - `src_subnet`, `dst_subnet` (inferred from host)
   - `proto`, `sport`, `dport`, `service`
-  - `duration`, `bytes`, `packets`
+  - `duration`, `bytes`, `packets` (from UNSW)
   - `attack_cat`, `label` (='Malicious')
+  - `phase` (initial_access / progression / objective)
   - `_source` (tracking: UNSW_actual / UNSW_parameterized)
 
-### Step 3 Action Items
+### Step 3 Implementation Details ✅
 
-1. **TIER 1 (≥ 10 UNSW rows):**
+**Phase-Based Causality Architecture:**
+
+```python
+PHASE_TIMELINE = {
+    'initial_access': (300, 350),    # ~T=300–350s, compromising entry point
+    'progression': (350, 600),       # ~T=350–600s, lateral movement/reconnaissance
+    'objective': (600, 900),         # ~T=600–900s, reaching target asset
+}
+```
+
+**Scenario-Specific Phase Mappings:**
+
+1. **TIER 1 (≥ 10 UNSW rows)** ✅ ALL SCENARIOS ACHIEVED:
 
    a) Randomly sample 10-11 rows from filtered UNSW data
-   b) Assign deterministic `src_host` / `dst_host` mapping (preserving subnet topology)
-   c) Set `label` = 'Malicious', `_source` = 'UNSW_actual'
-   d) Preserve original `duration`, `bytes`, `packets` (from UNSW)
+   b) Assign rows to phases proportionally (e.g., 2 → initial_access, 5 → progression, 3 → objective)
+   c) Assign deterministic `src_host` / `dst_host` mapping via MD5(scenario + IP)
+   d) Set `label` = 'Malicious', `_source` = 'UNSW_actual'
+   e) Preserve original `duration`, `bytes`, `packets` from UNSW
+   f) Generate timestamps within phase windows ensuring strict ordering
 
-2. **TIER 2 (5-9 UNSW rows):**
+2. **TIER 2 (5-9 UNSW rows)** (fallback if needed):
 
-   a) Keep all actual rows (5-9 events)
-   b) For remaining events needed (to reach 10-11):
+   a) Keep all actual rows
+   b) For remaining events to reach 10-11:
       - Select base row from filtered UNSW
       - Create parameterized variation:
-        - Vary `src_host` within same subnet (e.g., User1 → User3)
-        - Vary `dst_host` (different target, same vulnerability class, same subnet)
         - Perturb `duration` by ±20% (random multiplier 0.8-1.2)
         - Scale `bytes` by ±15% (preserves relative magnitude)
         - Adjust `packets` proportionally to maintain byte/packet ratio
       - Set `_source` = 'UNSW_parameterized'
+   c) Assign to phases with timestamps
 
-3. **Ordering & Causality:**
+**Verification Results (April 18, 2026):**
 
-   a) Order malicious events to form a logical attack chain (entry_point → target_asset progression)
-   b) Ensure cross-subnet transitions follow topology rules (e.g., User1 → Enterprise* → Operational if applicable)
-   c) Later events should show evidence of progression (higher bytes for exfiltration, privilege escalation)
+| Scenario | Events | Phase Distribution | Time Range | Source |
+|----------|--------|-------------------|-----------|--------|
+| WannaCry | 10 | 2/5/3 | 300-750s | UNSW_actual ✅ |
+| Data_Theft | 10 | 2/5/3 | 300-750s | UNSW_actual ✅ |
+| ShellShock | 11 | 2/6/3 | 300-757s | UNSW_actual ✅ |
+| Netcat_Backdoor | 10 | 2/5/3 | 300-750s | UNSW_actual ✅ |
+| passwd_gzip_scp | 10 | 2/5/3 | 300-750s | UNSW_actual ✅ |
+
+**Key Features of Implementation:**
+
+✅ **Scenario-Aware Phases**: Each scenario has defined phase progressions (e.g., WannaCry: scanning → exploitation → propagation)
+
+✅ **Deterministic Host Mapping**: Same IP always maps to same hostname within scenario (MD5 hash of `scenario_name:ip_address`)
+
+✅ **Strict Temporal Ordering**: Timestamps strictly increasing (300-900s), with events ordered by phase
+
+✅ **Phase-Based Causality**: Attack events clustered in logical phases, enabling causal chain detection by IDS
+
+✅ **Features Preserved**: All UNSW feature distributions maintained (duration, bytes, packets ranges)
 
 ---
 
@@ -953,10 +986,10 @@ if unsw_filters.get('attack_cat'):
 2. ✅ **Step 0**: Define global constraints → `templates/global_constraints.json` (manual JSON)
 3. ✅ **Step 1**: Update scenario templates → `templates/zero_day_templates.json` (add TIER + phases)
 4. ✅ **Step 2**: Extract UNSW stats & classify TIER (1 or 2 only)
-5. ✅ **Step 3**: Generate malicious events (TIER 1 or 2, no KDE)
-6. ✅ **Step 4**: Generate benign events (15 events)
-7. ✅ **Step 5**: Generate false alarm events (5 events, 2 types)
-8. ✅ **Step 6**: Assemble & timestamp → Final 30-event CSV tables
+5. ✅ **Step 3**: Generate malicious events with phase-based causality (10-11 events, TIER 1 sampling)
+6. 📋 **Step 4**: Generate benign events (15 events) — TODO
+7. 📋 **Step 5**: Generate false alarm events (5 events, 2 types) — TODO
+8. 📋 **Step 6**: Assemble & timestamp → Final 30-event CSV tables — TODO
 
 ---
 

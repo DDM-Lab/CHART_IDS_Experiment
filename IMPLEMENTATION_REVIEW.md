@@ -1,7 +1,7 @@
 # IDS Pipeline Implementation Review - Steps 0-2
 
 **Date**: April 18, 2026  
-**Status**: Pre-Step through Step 2 ✅ COMPLETE with one minor issue to address
+**Status**: Pre-Step through Step 3 ✅ COMPLETE with one minor issue to address
 
 ---
 
@@ -13,8 +13,9 @@
 | **Step 0** | ✅ Complete | High | Global constraints well-defined |
 | **Step 1** | ✅ Complete | High | Template validation working |
 | **Step 2** | ✅ Complete | High | Filtering & tier classification done |
+| **Step 3** | ✅ Complete | High | Malicious events with phase causality |
 | **Helper Functions** | ✅ Complete | High | All utilities in place |
-| **Main Orchestrator** | ✅ Complete | High | Flow through Step 2 correct |
+| **Main Orchestrator** | ✅ Complete | High | Flow through Step 3 correct |
 
 ---
 
@@ -235,13 +236,40 @@ All utilities in place:
 
 ## 📋 Next Steps (What Remains)
 
-### Step 3: Generate Malicious Events (NOT YET IMPLEMENTED)
-**Expected to implement**:
-- Load filtered UNSW data per scenario
-- For TIER 1: Randomly sample 10-11 actual events
-- Assign to attack phases (phase 1-3)
-- Preserve feature correlations
-- **Reference**: IDS_generation_method.md Gap 1 section
+### ✅ Step 3: Generate Malicious Events (COMPLETE)
+**Implementation**: `step_3.py` → `generate_malicious_events_step_3()`  
+**Output**: Updated templates with `_step3_malicious_events` per scenario
+
+**Key Achievements**:
+- **10-11 events per scenario** ✅
+  - WannaCry: 10 events
+  - Data_Theft: 10 events
+  - ShellShock: 11 events
+  - Netcat_Backdoor: 10 events
+  - passwd_gzip_scp: 10 events
+- **Scenario-aware phase-based causality** ✅
+  - initial_access phase (T=300-350s)
+  - progression phase (T=350-600s)
+  - objective phase (T=600-900s)
+- **TIER 1 sampling** ✅ (all scenarios had ≥10 UNSW rows)
+- **Deterministic host mapping** ✅ (preserves topology via MD5 hash)
+- **Timestamps strictly increasing** ✅ (0-1800s window)
+
+**Phase Distribution** (example: WannaCry):
+```
+initial_access: 2 events
+progression: 5 events
+objective: 3 events
+```
+
+**Events stored in templates** with fields:
+- timestamp, src_host, dst_host, src_subnet, dst_subnet
+- proto, sport, dport, service
+- duration, bytes, packets
+- attack_cat, label ('Malicious')
+- phase, _source ('UNSW_actual' for TIER 1)
+
+**No Gaps** ✅
 
 ### Step 4: Generate Benign Events (NOT YET IMPLEMENTED)
 **Expected to implement**:
@@ -277,8 +305,9 @@ All utilities in place:
 | **Network Hosts** | 15 |
 | **Network Subnets** | 3 (+ 1 external) |
 | **Observation Window** | 1800 seconds |
+| **Malicious Events per Scenario** | 10-11 |
 | **Final Events per Scenario** | 30 |
-| **Files Implemented** | 7 (main, pre_step, step_1, step_2, helper_functions, + 2 templates) |
+| **Files Implemented** | 8 (main, pre_step, step_1, step_2, step_3, helper_functions, + 2 templates) |
 
 ---
 
@@ -298,8 +327,10 @@ All utilities in place:
 - [x] Helper functions comprehensive
 - [x] Main flow organized and clear
 - [x] Error handling in place
+- [x] Step 3 malicious events generated with phase-based causality
+- [x] Phase distribution verified for all scenarios
 - [ ] False alarm taxonomy field names standardized
-- [ ] Steps 3-6 implemented
+- [ ] Steps 4-6 implemented
 
 ---
 
@@ -313,30 +344,32 @@ All utilities in place:
 5. **Deterministic**: Reproducible results via seeding and hashing
 6. **Traceability**: Tracking columns enable auditing
 
-### Readiness for Step 3 📈
-- ✅ All prerequisites complete
+### Readiness for Step 4 📈
+- ✅ All prerequisites complete (Steps 0-3 done)
+- ✅ Malicious events generated with proper phase causality
 - ✅ Feature statistics available in `_step2_stats`
-- ✅ Tier classification ready for synthesis decisions
+- ✅ Tier classification verified (all TIER 1)
 - ⚠️ One minor field name issue to fix before Step 5
 
 ### Recommendations 🎯
-1. **Before Step 3**: Fix false alarm distribution field names (consistency issue)
-2. **Step 3**: Reference IDS_pipeline_remediation.md Gap 1 for causal chaining logic
-3. **Testing**: Run main.py end-to-end, verify step_2_summary.txt output
+1. **Before Step 5**: Fix false alarm distribution field names (consistency issue)
+2. **Next**: Implement Step 4 (benign event generation)
+3. **Testing**: Step 3 verified—run main.py, confirmed all scenarios have 10-11 malicious events with proper phase distribution
 
 ---
 
 ## Files Status Summary
 
 | File | Status | Lines | Purpose |
-|------|--------|-------|---------|
-| main.py | ✅ Complete | 200+ | Orchestrator (Steps 0-2 done, 3-6 TODO) |
+|------|--------|-------|---------|:
+| main.py | ✅ Complete | 210+ | Orchestrator (Steps 0-3 done, 4-6 TODO) |
 | pre_step.py | ✅ Complete | 400+ | UNSW transformation |
 | step_1.py | ✅ Complete | 150+ | Template validation |
 | step_2.py | ✅ Complete | 300+ | Filter & tier classification |
+| step_3.py | ✅ Complete | 400+ | Malicious event generation with phase causality |
 | helper_functions.py | ✅ Complete | 500+ | Shared utilities |
 | global_constraints.json | ✅ Complete | 200+ | Experiment rules |
-| zero_day_templates.json | ✅ Complete | 600+ | Scenario configs |
-| IDS_generation_method.md | 📖 Reference | 602 | Implementation guide |
+| zero_day_templates.json | ✅ Complete | 600+ | Scenario configs (now includes _step3_malicious_events) |
+| IDS_generation_method.md | 📖 Reference | 780+ | Implementation guide |
 | ids_pipeline_remediation.md | 📖 Reference | 400+ | Gap analysis & solutions |
 

@@ -6,6 +6,7 @@ import json
 import pre_step
 import step_1
 import step_2
+import step_3
 from pathlib import Path
 
 def main():
@@ -122,7 +123,20 @@ def main():
     # Ensure logical attack progression and valid network structure
     # Output: malicious events (per scenario)
     # ============================================================
-    # TODO: Implement Step 3
+    
+    print(f"\nRunning Step 3: generating malicious events...")
+    step3_result = step_3.generate_malicious_events_step_3(
+        str(output_transformed_csv),
+        str(templates_path),
+        str(global_constraints_path),
+        random_seed=42
+    )
+    
+    if not step3_result['success']:
+        raise ValueError(
+            f"Step 3 failed: {len(step3_result['errors'])} error(s)\n"
+            + "\n".join(step3_result['errors'])
+        )
 
 
     # ============================================================
@@ -154,11 +168,11 @@ def main():
 
     # ============================================================
     # PIPELINE FLOW
-    # Run steps in order: Pre-Step -> 0 -> 1 -> 2
-    # Then per scenario: 3 -> 4 -> 5 -> 6
+    # Run steps in order: Pre-Step -> 0 -> 1 -> 2 -> 3
+    # Then per scenario: 4 -> 5 -> 6
     # ============================================================
     print("\n" + "="*80)
-    print(" PIPELINE STEPS 0-2 COMPLETED SUCCESSFULLY")
+    print(" PIPELINE STEPS 0-3 COMPLETED SUCCESSFULLY")
     print("="*80)
 
 
