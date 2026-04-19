@@ -87,6 +87,7 @@ def generate_benign_events_step_4(
     transformed_csv_path,
     templates_path,
     global_constraints_path,
+    benign_count_per_scenario=None,
     random_seed=42,
     output_debug=False
 ):
@@ -97,6 +98,8 @@ def generate_benign_events_step_4(
         transformed_csv_path (str): Path to UNSW_NB15_transformed.csv
         templates_path (str): Path to templates/zero_day_templates.json
         global_constraints_path (str): Path to templates/global_constraints.json
+        benign_count_per_scenario (dict): Map of scenario_name -> benign_count
+                                          If None, defaults to 15 for all scenarios
         random_seed (int): Seed for reproducibility
         output_debug (bool): Whether to output debug info
     
@@ -105,8 +108,8 @@ def generate_benign_events_step_4(
             'success': bool,
             'errors': [list of error strings],
             'benign_events_per_scenario': {
-                'WannaCry': [15 event dicts],
-                'Data_Theft': [15 event dicts],
+                'WannaCry': [benign event dicts],
+                'Data_Theft': [benign event dicts],
                 ...
             }
         }
@@ -152,12 +155,19 @@ def generate_benign_events_step_4(
                     errors.append(f"Scenario {scenario_name} not found in templates")
                     continue
                 
-                # Generate 15 benign events (scenario-independent)
+                # Get benign count from parameter or use default
+                if benign_count_per_scenario and scenario_name in benign_count_per_scenario:
+                    ben_count = benign_count_per_scenario[scenario_name]
+                else:
+                    ben_count = 15  # Default for backwards compatibility
+                
+                # Generate benign events (scenario-independent)
                 events = _generate_benign_events_for_scenario(
                     scenario_name,
                     pooled_benign_df,
                     scenario_template,
-                    global_constraints
+                    global_constraints,
+                    benign_count=ben_count
                 )
                 
                 benign_events_per_scenario[scenario_name] = events
@@ -190,28 +200,34 @@ def generate_benign_events_step_4(
         }
 
 
-def _generate_benign_events_for_scenario(scenario_name, pooled_benign_df, template, constraints):
+def _generate_benign_events_for_scenario(scenario_name, pooled_benign_df, template, constraints, benign_count=15):
     """
-    Generate 15 benign events for a single scenario.
+    Generate benign events for a single scenario.
     
     Strategy:
-    - Sample 15 random rows from pooled_benign_df (scenario-independent)
+    - Sample benign_count random rows from pooled_benign_df (scenario-independent)
     - Assign to random services with deterministic host mapping
     - Spread timestamps uniformly across [0, 1800] seconds
     - Apply topology constraints (routing rules)
+    - Handle edge case: benign_count=0 (no benign events)
     
     Args:
         scenario_name (str): Scenario name (e.g., 'WannaCry')
         pooled_benign_df (pd.DataFrame): Benign rows from all scenarios combined
         template (dict): Scenario template
         constraints (dict): Global constraints
+        benign_count (int): Number of benign events to generate (default: 15)
     
     Returns:
-        list: 15 event dictionaries
+        list: Benign event dictionaries (may be empty if benign_count=0)
     """
     
-    # Sample 15 random benign rows
-    num_events = 15
+    # Handle edge case: no benign events requested
+    if benign_count == 0:
+        return []
+    
+    # Sample benign_count random benign rows
+    num_events = min(benign_count, len(pooled_benign_df))
     if len(pooled_benign_df) < num_events:
         sampled_df = pooled_benign_df.copy()
     else:

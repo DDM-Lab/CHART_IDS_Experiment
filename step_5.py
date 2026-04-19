@@ -64,6 +64,8 @@ def generate_false_alarms_step_5(
     transformed_csv_path,
     templates_path,
     global_constraints_path,
+    false_alarm_count_per_scenario=None,
+    fa_type_ratio_mode="balanced",
     random_seed=42,
     output_debug=False
 ):
@@ -74,6 +76,10 @@ def generate_false_alarms_step_5(
         transformed_csv_path (str): Path to UNSW_NB15_transformed.csv
         templates_path (str): Path to templates/zero_day_templates.json
         global_constraints_path (str): Path to templates/global_constraints.json
+        false_alarm_count_per_scenario (dict): Map of scenario_name -> false_alarm_count
+                                               If None, defaults to 5 for all scenarios
+        fa_type_ratio_mode (str): Distribution mode for false alarm types
+                                  One of: balanced | port_heavy | volume_heavy | duration_heavy
         random_seed (int): Seed for reproducibility
         output_debug (bool): Whether to output debug info
     
@@ -82,8 +88,8 @@ def generate_false_alarms_step_5(
             'success': bool,
             'errors': [list of error strings],
             'false_alarm_events_per_scenario': {
-                'WannaCry': [4-5 event dicts],
-                'Data_Theft': [4-5 event dicts],
+                'WannaCry': [false alarm event dicts],
+                'Data_Theft': [false alarm event dicts],
                 ...
             }
         }
@@ -132,13 +138,21 @@ def generate_false_alarms_step_5(
                     errors.append(f"Scenario {scenario_name} not found in templates")
                     continue
                 
-                # Generate false alarms (5 total: Type 1 x2 + Type 2 x2 + Type 3 x1)
+                # Get false alarm count from parameter or use default
+                if false_alarm_count_per_scenario and scenario_name in false_alarm_count_per_scenario:
+                    fa_count = false_alarm_count_per_scenario[scenario_name]
+                else:
+                    fa_count = 5  # Default for backwards compatibility
+                
+                # Generate false alarms with specified count and type distribution
                 events = _generate_false_alarms_for_scenario(
                     scenario_name,
                     pooled_benign_df,
                     benign_stats,
                     scenario_template,
-                    global_constraints
+                    global_constraints,
+                    false_alarm_count=fa_count,
+                    fa_type_ratio_mode=fa_type_ratio_mode
                 )
                 
                 false_alarm_events_per_scenario[scenario_name] = events
@@ -149,7 +163,9 @@ def generate_false_alarms_step_5(
         
         # Validate all false alarms
         for scenario_name, events in false_alarm_events_per_scenario.items():
-            validation_errors = _validate_false_alarms(events, scenario_name)
+            fa_count = (false_alarm_count_per_scenario.get(scenario_name, 5) 
+                       if false_alarm_count_per_scenario else 5)
+            validation_errors = _validate_false_alarms(events, scenario_name, expected_count=fa_count)
             if validation_errors:
                 errors.extend(validation_errors)
         
@@ -200,14 +216,15 @@ def _compute_benign_stats(benign_df):
     return stats
 
 
-def _generate_false_alarms_for_scenario(scenario_name, pooled_benign_df, benign_stats, template, constraints):
+def _generate_false_alarms_for_scenario(scenario_name, pooled_benign_df, benign_stats, template, constraints, false_alarm_count=5, fa_type_ratio_mode="balanced"):
     """
-    Generate 5 false alarm events for a single scenario.
+    Generate false alarm events for a single scenario.
     
     Strategy:
-    - Type 1 (2 events): Unusual port + benign service (uses benign UNSW row as template)
-    - Type 2 (2 events): High volume + benign service (high bytes, otherwise benign features)
-    - Type 3 (1 event): Rare duration + benign service (high duration, otherwise benign features)
+    - Distribute false_alarm_count across 3 types using fa_type_ratio_mode
+    - Type 1: Unusual port + benign service (uses benign UNSW row as template)
+    - Type 2: High volume + benign service (high bytes, otherwise benign features)
+    - Type 3: Rare duration + benign service (high duration, otherwise benign features)
     - All events marked as attack_cat='Normal', label='False Alarm'
     - Spread timestamps across [0, 1800] seconds
     
@@ -217,22 +234,47 @@ def _generate_false_alarms_for_scenario(scenario_name, pooled_benign_df, benign_
         benign_stats (dict): Computed stats from benign data
         template (dict): Scenario template
         constraints (dict): Global constraints
+        false_alarm_count (int): Total number of false alarm events to generate (default: 5)
+        fa_type_ratio_mode (str): Distribution mode for types. Default: "balanced" (40:40:20)
     
     Returns:
-        list: 5 event dictionaries
+        list: False alarm event dictionaries (may be empty if false_alarm_count=0)
     """
     
-    # Sample 5 benign rows as templates
-    num_events = 5
-    if len(pooled_benign_df) < num_events:
+    # Handle edge case: no false alarms requested
+    if false_alarm_count == 0:
+        return []
+    
+    # Type distribution ratios (default balanced: 40% Type1, 40% Type2, 20% Type3)
+    type_ratios = {
+        "balanced": {"type_1": 0.4, "type_2": 0.4, "type_3": 0.2},
+        "port_heavy": {"type_1": 0.6, "type_2": 0.2, "type_3": 0.2},
+        "volume_heavy": {"type_1": 0.2, "type_2": 0.6, "type_3": 0.2},
+        "duration_heavy": {"type_1": 0.2, "type_2": 0.2, "type_3": 0.6},
+    }
+    
+    # Get distribution for this mode (default to balanced if invalid)
+    distribution = type_ratios.get(fa_type_ratio_mode, type_ratios["balanced"])
+    
+    # Compute type counts from distribution
+    type_1_count = int(false_alarm_count * distribution["type_1"])
+    type_2_count = int(false_alarm_count * distribution["type_2"])
+    type_3_count = false_alarm_count - type_1_count - type_2_count  # Remainder
+    
+    # Sample required number of benign rows as templates
+    num_templates = min(false_alarm_count, len(pooled_benign_df))
+    if num_templates == 0:
+        return []
+    
+    if len(pooled_benign_df) < num_templates:
         sampled_df = pooled_benign_df.copy()
     else:
-        sampled_df = pooled_benign_df.sample(n=num_events, random_state=None)
+        sampled_df = pooled_benign_df.sample(n=num_templates, random_state=None)
     
     sampled_df = sampled_df.reset_index(drop=True)
     
     # Generate timestamps spread across [0, 1800]
-    timestamps = sorted([random.uniform(0, 1800) for _ in range(len(sampled_df))])
+    timestamps = sorted([random.uniform(0, 1800) for _ in range(false_alarm_count)])
     
     events = []
     event_idx = 0
@@ -492,7 +534,7 @@ def _generate_type3_rare_duration(scenario_name, base_row, timestamp, benign_sta
     return event
 
 
-def _validate_false_alarms(events, scenario_name):
+def _validate_false_alarms(events, scenario_name, expected_count=5):
     """
     Validate false alarm events.
     
@@ -501,14 +543,23 @@ def _validate_false_alarms(events, scenario_name):
     Args:
         events (list): False alarm events
         scenario_name (str): Scenario name
+        expected_count (int): Expected number of false alarm events (default: 5, backwards compatible)
     
     Returns:
         list: List of error strings (empty if all valid)
     """
     errors = []
     
+    if expected_count == 0:
+        # If no false alarms expected, that's valid
+        if len(events) == 0:
+            return errors
+        else:
+            errors.append(f"{scenario_name}: Expected 0 false alarms but got {len(events)}")
+            return errors
+    
     if not events:
-        errors.append(f"{scenario_name}: No false alarm events generated")
+        errors.append(f"{scenario_name}: No false alarm events generated (expected {expected_count})")
         return errors
     
     # Check that all have attack_cat='Normal'
@@ -518,9 +569,9 @@ def _validate_false_alarms(events, scenario_name):
             f"{scenario_name}: {len(events) - normal_count} false alarms missing attack_cat='Normal'"
         )
     
-    # Check count
-    if len(events) != 5:
-        errors.append(f"{scenario_name}: Expected 5 false alarms, got {len(events)}")
+    # Check count (allow for small rounding differences)
+    if len(events) != expected_count:
+        errors.append(f"{scenario_name}: Expected {expected_count} false alarms, got {len(events)}")
     
     return errors
 

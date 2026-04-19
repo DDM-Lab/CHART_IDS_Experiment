@@ -189,13 +189,18 @@ def assign_timestamps_to_events(
     return timestamped_events
 
 
-def validate_30_event_table(events, scenario_name):
+def validate_30_event_table(events, scenario_name, expected_total=30, expected_malicious=10, 
+                             expected_benign=15, expected_false_alarm=5):
     """
-    Validate that 30-event table meets all requirements.
+    Validate that final event table meets all requirements.
     
     Args:
-        events (list): List of event dicts (should have ~30)
+        events (list): List of event dicts
         scenario_name (str): Scenario name (for reporting)
+        expected_total (int): Expected total events (default: 30, for compatibility)
+        expected_malicious (int): Expected malicious events (default: 10, for compatibility)
+        expected_benign (int): Expected benign events (default: 15, for compatibility)
+        expected_false_alarm (int): Expected false alarm events (default: 5, for compatibility)
         
     Returns:
         dict: {
@@ -216,19 +221,24 @@ def validate_30_event_table(events, scenario_name):
     benign_count = sum(1 for e in events if e.get('label') == 'Benign')
     false_alarm_count = sum(1 for e in events if e.get('label') == 'False Alarm')
     
-    # Check 1: Approximately 30 events (29-31 range to accommodate 10-11 mal + 15 ben + 4-5 FA)
-    if not (29 <= total_events <= 31):
-        errors.append(f"Expected ~30 events (29-31 range), got {total_events}")
+    # Check 1: Event count within tolerance (±1 due to rounding)
+    if not (expected_total - 1 <= total_events <= expected_total + 1):
+        errors.append(f"Expected ~{expected_total} events, got {total_events}")
     
-    # Check 2: Label counts in range
-    if not (10 <= malicious_count <= 11):
-        errors.append(f"Malicious count {malicious_count} not in range [10-11]")
+    # Check 2: Label counts match expected (with tolerance for rounding)
+    if malicious_count != expected_malicious:
+        errors.append(f"Malicious count {malicious_count} != expected {expected_malicious}")
     
-    if benign_count != 15:
-        warnings.append(f"Benign count {benign_count} differs from target 15")
+    if benign_count != expected_benign:
+        errors.append(f"Benign count {benign_count} != expected {expected_benign}")
     
-    if not (4 <= false_alarm_count <= 5):
-        warnings.append(f"False alarm count {false_alarm_count} not in range [4-5]")
+    if false_alarm_count != expected_false_alarm:
+        if expected_false_alarm == 0:
+            # If zero false alarms expected, any generation is an error
+            errors.append(f"False alarm count {false_alarm_count} != expected {expected_false_alarm}")
+        else:
+            # Otherwise just warn if close
+            errors.append(f"False alarm count {false_alarm_count} != expected {expected_false_alarm}")
     
     # Check 3: Timestamps strictly increasing
     if len(events) > 1:
@@ -272,15 +282,32 @@ def write_scenario_csv(
     events,
     scenario_name,
     output_dir,
+    total_events_param=30,
+    false_alarm_pct_param=0.15,
+    malicious_count=10,
+    benign_count=15,
+    false_alarm_count=5,
     output_report_path=None,
 ):
     """
-    Write 30-event table to CSV for a single scenario.
+    Write final IDS table to CSV for a single scenario with metadata columns.
+    
+    Metadata columns (positions 0-4):
+    - _total_events_param: Total events config parameter
+    - _false_alarm_pct_param: False alarm percentage as decimal
+    - _malicious_count_param: Malicious events in this scenario
+    - _benign_count_param: Benign events in this scenario
+    - _false_alarm_count_param: False alarm events in this scenario
     
     Args:
-        events (list): List of validated event dicts (30 events)
+        events (list): List of validated event dicts
         scenario_name (str): Scenario name
         output_dir (str/Path): Directory to save CSV
+        total_events_param (int): Total events config parameter (default: 30)
+        false_alarm_pct_param (float): False alarm percentage as decimal (default: 0.15)
+        malicious_count (int): Malicious event count (default: 10)
+        benign_count (int): Benign event count (default: 15)
+        false_alarm_count (int): False alarm event count (default: 5)
         output_report_path (str): Optional path to write summary report
         
     Returns:
@@ -299,20 +326,20 @@ def write_scenario_csv(
         # Create DataFrame
         df = pd.DataFrame(events)
         
-        # Column order (EXACT as spec: 23 columns)
-        columns_ordered = [
-            'timestamp', 'src_host', 'dst_host', 'src_subnet', 'dst_subnet',
-            'proto', 'sport', 'dport', 'service', 'duration', 'bytes', 'packets',
-            'sttl', 'dttl', 'state', 'sloss', 'dloss', 'ct_src_dport_ltm', 'ct_dst_src_ltm',
-            'attack_cat', 'label',
-            '_unsw_row_id', 'scenario_name'  # Tracking columns
-        ]
+        # Add metadata columns at the beginning
+        metadata_df = pd.DataFrame({
+            '_total_events_param': [total_events_param] * len(df),
+            '_false_alarm_pct_param': [false_alarm_pct_param] * len(df),
+            '_malicious_count_param': [malicious_count] * len(df),
+            '_benign_count_param': [benign_count] * len(df),
+            '_false_alarm_count_param': [false_alarm_count] * len(df),
+        })
         
-        # Reorder columns
-        df = df[columns_ordered]
+        # Concatenate metadata columns with existing columns
+        df = pd.concat([metadata_df, df], axis=1)
         
         # Write to CSV
-        csv_path = output_dir / f"{scenario_name}_30_events.csv"
+        csv_path = output_dir / f"{scenario_name}_{total_events_param}events.csv"
         df.to_csv(csv_path, index=False)
         
         row_count = len(df)
@@ -325,10 +352,13 @@ def write_scenario_csv(
                 f.write(f"{'='*80}\n")
                 f.write(f"CSV Path: {csv_path}\n")
                 f.write(f"Row Count: {row_count}\n")
-                f.write(f"Column Count: {len(columns_ordered)}\n")
-                f.write(f"\nColumn Order:\n")
-                for i, col in enumerate(columns_ordered, 1):
-                    f.write(f"  {i:2d}. {col}\n")
+                f.write(f"Total Columns (metadata + flow): {len(df.columns)}\n")
+                f.write(f"\nMetadata Columns (first 5):\n")
+                f.write(f"  1. _total_events_param: {total_events_param}\n")
+                f.write(f"  2. _false_alarm_pct_param: {false_alarm_pct_param:.2f}\n")
+                f.write(f"  3. _malicious_count_param: {malicious_count}\n")
+                f.write(f"  4. _benign_count_param: {benign_count}\n")
+                f.write(f"  5. _false_alarm_count_param: {false_alarm_count}\n")
                 f.write(f"\nLabel Distribution:\n")
                 for label in ['Malicious', 'Benign', 'False Alarm']:
                     count = sum(1 for e in events if e.get('label') == label)
@@ -362,16 +392,28 @@ def write_scenario_csv(
 
 def assemble_30_events_step_6(
     templates_path,
+    global_constraints_path,
     output_dir='IDS_tables',
+    malicious_count_per_scenario=None,
+    benign_count_per_scenario=None,
+    false_alarm_count_per_scenario=None,
+    total_events_param=30,
+    false_alarm_pct_param=0.15,
     output_report_path='step_6_summary.txt',
     random_seed=42,
 ):
     """
-    Main orchestrator for Step 6: Assemble final 30-event IDS tables.
+    Main orchestrator for Step 6: Assemble final IDS tables with parameterized event counts.
     
     Args:
-        templates_path (str): Path to themes/zero_day_templates.json
+        templates_path (str): Path to templates/zero_day_templates.json
+        global_constraints_path (str): Path to templates/global_constraints.json
         output_dir (str): Directory to save output CSVs
+        malicious_count_per_scenario (dict): Map of scenario_name -> malicious_count
+        benign_count_per_scenario (dict): Map of scenario_name -> benign_count
+        false_alarm_count_per_scenario (dict): Map of scenario_name -> false_alarm_count
+        total_events_param (int): Total events per table (for metadata column, default: 30)
+        false_alarm_pct_param (float): False alarm percentage (for metadata column, default: 0.15)
         output_report_path (str): Path to save summary report
         random_seed (int): Seed for reproducibility
         
@@ -390,10 +432,19 @@ def assemble_30_events_step_6(
     validation_results = {}
     
     try:
-        # Load templates
-        print("\nStep 6: Assembling final 30-event IDS tables...")
+        # Load templates and global constraints
+        print("\nStep 6: Assembling final IDS tables with temporal ordering...")
         print(f"  Loading templates from {templates_path}")
+        print(f"  Loading constraints from {global_constraints_path}")
         templates = load_templates(templates_path)
+        
+        with open(global_constraints_path, 'r') as f:
+            global_constraints = json.load(f)
+        
+        # Create output directory
+        output_dir_path = Path(output_dir)
+        output_dir_path.mkdir(parents=True, exist_ok=True)
+        print(f"  Output directory: {output_dir_path}")
         
         # Clear/create report
         report_path = Path(output_report_path)
@@ -401,10 +452,12 @@ def assemble_30_events_step_6(
         
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write("="*80 + "\n")
-            f.write("STEP 6: FINAL 30-EVENT IDS TABLE ASSEMBLY\n")
+            f.write("STEP 6: FINAL IDS TABLE ASSEMBLY WITH PARAMETERIZED COUNTS\n")
             f.write("="*80 + "\n\n")
             f.write(f"Timestamp: {pd.Timestamp.now()}\n")
             f.write(f"Output Directory: {output_dir}\n")
+            f.write(f"Total Events Per Table: {total_events_param}\n")
+            f.write(f"False Alarm Percentage: {false_alarm_pct_param*100:.0f}%\n")
             f.write(f"Random Seed: {random_seed}\n\n")
         
         # Process each scenario
@@ -416,6 +469,14 @@ def assemble_30_events_step_6(
             if not scenario:
                 errors.append(f"Scenario {scenario_name} not found in templates")
                 continue
+            
+            # Get event counts from parameters or defaults
+            mal_count = (malicious_count_per_scenario.get(scenario_name, 10) 
+                        if malicious_count_per_scenario else 10)
+            ben_count = (benign_count_per_scenario.get(scenario_name, 15) 
+                        if benign_count_per_scenario else 15)
+            fa_count = (false_alarm_count_per_scenario.get(scenario_name, 5) 
+                       if false_alarm_count_per_scenario else 5)
             
             # Extract events from templates
             malicious_events = scenario.get('_step3_malicious_events', [])
@@ -435,7 +496,14 @@ def assemble_30_events_step_6(
             )
             
             # Validate
-            validation = validate_30_event_table(timestamped_events, scenario_name)
+            validation = validate_30_event_table(
+                timestamped_events,
+                scenario_name,
+                expected_total=mal_count + ben_count + fa_count,
+                expected_malicious=mal_count,
+                expected_benign=ben_count,
+                expected_false_alarm=fa_count
+            )
             validation_results[scenario_name] = validation
             
             if not validation['valid']:
@@ -448,11 +516,16 @@ def assemble_30_events_step_6(
             for warning in validation['warnings']:
                 print(f"    ⚠ {warning}")
             
-            # Write CSV
+            # Write CSV with metadata columns
             write_result = write_scenario_csv(
                 timestamped_events,
                 scenario_name,
                 output_dir,
+                total_events_param=total_events_param,
+                false_alarm_pct_param=false_alarm_pct_param,
+                malicious_count=mal_count,
+                benign_count=ben_count,
+                false_alarm_count=fa_count,
                 output_report_path=output_report_path
             )
             

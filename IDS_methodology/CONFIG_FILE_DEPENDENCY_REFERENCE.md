@@ -9,18 +9,18 @@
 ## QUICK REFERENCE: CONFIG FILE USAGE BY STEP
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    PIPELINE CONFIG FILE DEPENDENCIES                       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Pre-Step           Step 1          Step 2          Step 3          Step 4  │
-│  ────────           ──────          ──────          ──────          ──────  │
-│  (UNSW only)   ┌─ Constraints  ┌─ Constraints  ┌─ Constraints  ┌─ Constraints
-│                │  Templates    │  Templates    │  Templates    │  Templates
-│                └──────────────┘  Templates     │  Templates    │  Templates
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                    PIPELINE CONFIG FILE DEPENDENCIES                          │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  Pre-Step           Step 1          Step 2          Step 3          Step 4    │
+│  ────────           ──────          ──────          ──────          ──────    │
+│  (UNSW only)   ┌─ Constraints  ┌─ Constraints  ┌─ Constraints   ┌─ Constraints
+│                │  Templates    │  Templates    │  Templates     │  Templates
+│                └───────────────┘  Templates    │  Templates     │  Templates
 │                                  ├─ Phases ◄───┤  ├─ Phases ◄───┤  ├─ Phases
-│                                  ├─ Topology    │  ├─ Topology   │  ├─ Topology
-│                                  └─ TIER rules  │  └─ TIER rules │  └─ Counts
+│                                  ├─ Topology   │  ├─ Topology   │  ├─ Topology
+│                                  └─ TIER rules │  └─ TIER rules │  └─ Counts
 │
 │  Step 5          Step 6
 │  ──────          ──────

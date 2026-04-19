@@ -109,6 +109,7 @@ def generate_malicious_events_step_3(
     transformed_csv_path,
     templates_path,
     global_constraints_path,
+    malicious_count_per_scenario=None,
     random_seed=42,
     output_debug=False
 ):
@@ -119,6 +120,8 @@ def generate_malicious_events_step_3(
         transformed_csv_path (str): Path to UNSW_NB15_transformed.csv
         templates_path (str): Path to templates/zero_day_templates.json
         global_constraints_path (str): Path to templates/global_constraints.json
+        malicious_count_per_scenario (dict): Map of scenario_name -> malicious_count
+                                             If None, derives from templates (backwards compatible)
         random_seed (int): Seed for reproducibility
         output_debug (bool): Whether to output debug info
     
@@ -127,8 +130,8 @@ def generate_malicious_events_step_3(
             'success': bool,
             'errors': [list of error strings],
             'malicious_events_per_scenario': {
-                'WannaCry': [10-11 event dicts],
-                'Data_Theft': [10-11 event dicts],
+                'WannaCry': [malicious event dicts],
+                'Data_Theft': [malicious event dicts],
                 ...
             }
         }
@@ -171,20 +174,28 @@ def generate_malicious_events_step_3(
                 expected_tier = scenario_template.get('expected_tier', 1)
                 step2_stats = scenario_template.get('_step2_stats', {})
                 
+                # Get malicious count from parameter or template (backwards compatible)
+                if malicious_count_per_scenario and scenario_name in malicious_count_per_scenario:
+                    mal_count = malicious_count_per_scenario[scenario_name]
+                else:
+                    mal_count = scenario_template.get('malicious_count', 11)
+                
                 # Generate events (TIER 1 uses real data, TIER 2 adds parameterized)
                 if expected_tier == 1:
                     events = _generate_tier1_events(
                         scenario_name,
                         scenario_df,
                         scenario_template,
-                        step2_stats
+                        step2_stats,
+                        malicious_count=mal_count
                     )
                 else:
                     events = _generate_tier2_events(
                         scenario_name,
                         scenario_df,
                         scenario_template,
-                        step2_stats
+                        step2_stats,
+                        malicious_count=mal_count
                     )
                 
                 malicious_events_per_scenario[scenario_name] = events
@@ -217,22 +228,23 @@ def generate_malicious_events_step_3(
         }
 
 
-def _generate_tier1_events(scenario_name, filtered_df, template, stats):
+def _generate_tier1_events(scenario_name, filtered_df, template, stats, malicious_count=11):
     """
-    TIER 1 (≥10 UNSW rows): Sample 10-11 real events from filtered UNSW.
+    TIER 1 (≥10 UNSW rows): Sample real events from filtered UNSW.
     
     Args:
         scenario_name (str): Scenario name (e.g., 'WannaCry')
         filtered_df (pd.DataFrame): Filtered UNSW rows for this scenario
         template (dict): Scenario template with entry_point, target_asset
         stats (dict): Feature statistics from Step 2
+        malicious_count (int): Number of malicious events to generate
     
     Returns:
-        list: 10-11 event dictionaries
+        list: Malicious event dictionaries
     """
     
-    # Sample 10-11 random rows
-    num_events = random.randint(10, 11)
+    # Sample the specified number of events (or fewer if not enough data)
+    num_events = min(malicious_count, len(filtered_df))
     if len(filtered_df) < num_events:
         sampled_df = filtered_df.copy()
     else:
@@ -267,7 +279,7 @@ def _generate_tier1_events(scenario_name, filtered_df, template, stats):
     return all_events
 
 
-def _generate_tier2_events(scenario_name, filtered_df, template, stats):
+def _generate_tier2_events(scenario_name, filtered_df, template, stats, malicious_count=11):
     """
     TIER 2 (5-9 UNSW rows): Keep actual rows + add parameterized variations.
     
@@ -276,16 +288,17 @@ def _generate_tier2_events(scenario_name, filtered_df, template, stats):
         filtered_df (pd.DataFrame): Filtered UNSW rows for this scenario
         template (dict): Scenario template
         stats (dict): Feature statistics from Step 2
+        malicious_count (int): Total number of malicious events to generate
     
     Returns:
-        list: 10-11 event dictionaries (mix of actual + parameterized)
+        list: Malicious event dictionaries (mix of actual + parameterized)
     """
     
     # Keep all actual rows
     actual_rows = filtered_df.copy().reset_index(drop=True)
     num_actual = len(actual_rows)
-    num_needed = random.randint(10, 11)
-    num_parameterized = num_needed - num_actual
+    num_needed = malicious_count
+    num_parameterized = max(0, num_needed - num_actual)
     
     # Create parameterized variations
     parameterized_rows = []
