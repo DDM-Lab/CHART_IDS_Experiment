@@ -84,6 +84,16 @@ TEMPORAL_ARCHITECTURE = {
         ],
         'false_alarm_zones': [(1100, 1200), (1400, 1600)],
     },
+    'No_Attack': {
+        'total_duration': 1800,
+        'phases': [
+            {'name': 'benign_baseline_1', 'start': 0, 'end': 450, 'type': 'benign', 'event_count': 8},
+            {'name': 'benign_baseline_2', 'start': 450, 'end': 900, 'type': 'benign', 'event_count': 8},
+            {'name': 'benign_baseline_3', 'start': 900, 'end': 1350, 'type': 'benign', 'event_count': 8},
+            {'name': 'benign_baseline_4', 'start': 1350, 'end': 1800, 'type': 'benign', 'event_count': 6},
+        ],
+        'false_alarm_zones': [(300, 400), (700, 800), (1500, 1600)],  # Scattered throughout baseline
+    },
 }
 
 

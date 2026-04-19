@@ -391,21 +391,32 @@ def main():
     # Filter transformed data per scenario and compute feature statistics
     # Assign TIER (1 = sufficient data, 2 = limited data)
     # Output: updated templates with TIER + stats
+    # 
+    # NOTE: Skip for scenarios with malicious_count == 0 (e.g., No_Attack)
     # ============================================================
     
-    print(f"\nRunning Step 2: filtering & tier classification...")
-    step2_result = step_2.process_step_2(
-        str(output_transformed_csv),
-        str(working_templates_path),
-        str(global_constraints_path),
-        output_report_path="step_2_summary.txt"
-    )
+    # Check if any scenario is attack-free
+    scenarios_with_attacks = [s for s in templates_dict['scenarios'] if s.get('malicious_count', 0) > 0]
+    scenarios_no_attack = [s for s in templates_dict['scenarios'] if s.get('malicious_count', 0) == 0]
     
-    if not step2_result['success']:
-        raise ValueError(
-            f"Step 2 failed: {len(step2_result['errors'])} error(s)\n"
-            + "\n".join(step2_result['errors'])
+    if scenarios_with_attacks:
+        print(f"\nRunning Step 2: filtering & tier classification...")
+        step2_result = step_2.process_step_2(
+            str(output_transformed_csv),
+            str(working_templates_path),
+            str(global_constraints_path),
+            output_report_path="step_2_summary.txt"
         )
+        
+        if not step2_result['success']:
+            raise ValueError(
+                f"Step 2 failed: {len(step2_result['errors'])} error(s)\n"
+                + "\n".join(step2_result['errors'])
+            )
+    
+    if scenarios_no_attack:
+        print(f"\n[SKIPPED] Step 2 for attack-free scenarios: {[s['scenario_name'] for s in scenarios_no_attack]}")
+        print(f"           (No UNSW filtering needed for pure benign traffic)")
 
 
     # ============================================================
@@ -413,6 +424,8 @@ def main():
     # Generate attack events using real data (TIER 1) or + variations (TIER 2)
     # Ensure logical attack progression and valid network structure
     # Output: malicious events (per scenario)
+    #
+    # NOTE: Skip for scenarios with malicious_count == 0 (e.g., No_Attack)
     #
     # CONFIG FILE DEPENDENCIES:
     #   - templates_path (zero_day_templates.json):
@@ -423,20 +436,25 @@ def main():
     #     * Provides tiered_synthesis_framework (TIER 1/2/3 fallback rules)
     # ============================================================
     
-    print(f"\nRunning Step 3: generating malicious events...")
-    step3_result = step_3.generate_malicious_events_step_3(
-        str(output_transformed_csv),
-        str(working_templates_path),
-        str(global_constraints_path),
-        malicious_count_per_scenario=malicious_count_per_scenario,
-        random_seed=42
-    )
-    
-    if not step3_result['success']:
-        raise ValueError(
-            f"Step 3 failed: {len(step3_result['errors'])} error(s)\n"
-            + "\n".join(step3_result['errors'])
+    if scenarios_with_attacks:
+        print(f"\nRunning Step 3: generating malicious events...")
+        step3_result = step_3.generate_malicious_events_step_3(
+            str(output_transformed_csv),
+            str(working_templates_path),
+            str(global_constraints_path),
+            malicious_count_per_scenario=malicious_count_per_scenario,
+            random_seed=42
         )
+        
+        if not step3_result['success']:
+            raise ValueError(
+                f"Step 3 failed: {len(step3_result['errors'])} error(s)\n"
+                + "\n".join(step3_result['errors'])
+            )
+    
+    if scenarios_no_attack:
+        print(f"\n[SKIPPED] Step 3 for attack-free scenarios: {[s['scenario_name'] for s in scenarios_no_attack]}")
+        print(f"           (No malicious event generation needed)")
 
 
     # ============================================================

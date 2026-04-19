@@ -58,6 +58,10 @@ SCENARIO: passwd_gzip_scp
   Unique destination ports: 21, 80, 194, 5000
   Status: OK - Ready for synthesis
 
+SCENARIO: No_Attack
+--------------------------------------------------------------------------------
+  Status: SKIPPED - No UNSW filtering needed (malicious_count=0)
+
 ================================================================================
 OK - Updated templates saved successfully
 OK - Feature constraints populated from statistics

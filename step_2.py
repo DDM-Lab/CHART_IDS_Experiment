@@ -213,6 +213,16 @@ def process_step_2(
             errors.append(f"Scenario {scenario_idx}: Missing scenario_name")
             continue
         
+        # SKIP scenarios with no malicious events (e.g., No_Attack)
+        malicious_count = scenario_template.get('malicious_count', 0)
+        if malicious_count == 0:
+            print(f"\n--- Processing {scenario_name} (SKIPPED) ---")
+            print(f"    [No malicious events - pure benign scenario]")
+            report_lines.append(f"\nSCENARIO: {scenario_name}")
+            report_lines.append("-" * 80)
+            report_lines.append(f"  Status: SKIPPED - No UNSW filtering needed (malicious_count=0)")
+            continue
+        
         print(f"\n--- Processing {scenario_name} ---")
         report_lines.append(f"\nSCENARIO: {scenario_name}")
         report_lines.append("-" * 80)
@@ -320,7 +330,7 @@ def process_step_2(
     except Exception as e:
         print(f"Warning: Failed to save report: {e}")
     
-    success = len(errors) == 0 and len(scenarios_processed) == len(SCENARIOS)
+    success = len(errors) == 0 and len(scenarios_processed) > 0
     
     return {
         'success': success,

@@ -131,8 +131,11 @@ def validate_templates_step(templates_path, constraints_path, output_path=None):
             for scenario in templates.get('scenarios', []):
                 scenario_name = scenario.get('scenario_name', 'Unknown')
                 
-                entry_subnet = scenario.get('entry_point', {}).get('subnet')
-                target_subnet = scenario.get('target_asset', {}).get('subnet')
+                # Handle null entry_point/target_asset (for No_Attack scenario)
+                entry_point = scenario.get('entry_point')
+                target_asset = scenario.get('target_asset')
+                entry_subnet = entry_point.get('subnet') if entry_point else None
+                target_subnet = target_asset.get('subnet') if target_asset else None
                 
                 if entry_subnet and entry_subnet not in expected_subnets:
                     result['warnings'].append(

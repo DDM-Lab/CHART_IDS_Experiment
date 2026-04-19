@@ -598,6 +598,104 @@
       },
       "expected_tier": 1,
       "tier_notes": "To be determined in Step 2 by counting UNSW rows after filtering (TIER 1: >=10, TIER 2: 5-9, TIER 3: <5)"
+    },
+    {
+      "scenario_name": "No_Attack",
+      "malicious_count": 0,
+      "complexity": "minimal",
+      "complexity_justification": "Baseline benign traffic only; no attack phases or malicious event generation required",
+      "max_false_alarm_pct": 1.0,
+      "max_false_alarm_pct_rationale": "No malicious events constraint; all non-benign events can be false alarms. Max FA = (30-0)/30 = 100%.",
+      "attack_description": "No active cyber attack. Pure background network traffic representing normal enterprise operations.",
+      "entry_point": null,
+      "target_asset": null,
+      "key_attack_behaviors": null,
+      "unsw_filtering": {
+        "attack_cat": [],
+        "proto": [],
+        "dport": [],
+        "behavioral_cues": []
+      },
+      "feature_constraints": {
+        "duration": {
+          "min": 0.0,
+          "max": 59.999046,
+          "median": 0.5,
+          "_note": "seconds; generic benign traffic profile"
+        },
+        "bytes": {
+          "min": 60,
+          "max": 500000,
+          "median": 1500,
+          "_note": "total bytes (sbytes + dbytes); generic benign range"
+        },
+        "packets": {
+          "min": 1,
+          "max": 1000,
+          "median": 20,
+          "_note": "total packets (spkts + dpkts); generic benign range"
+        },
+        "rate": {
+          "median_mbps": 0.024,
+          "_note": "computed from median duration and bytes"
+        },
+        "dport": {
+          "unique_values": [
+            20,
+            21,
+            22,
+            25,
+            53,
+            80,
+            110,
+            161,
+            194,
+            388,
+            443,
+            5000
+          ],
+          "_note": "generic common benign service ports"
+        },
+        "_notes": "Generic benign traffic constraints; no UNSW filtering step required"
+      },
+      "temporal_architecture": {
+        "total_duration": 1800,
+        "phases": [
+          {
+            "name": "benign_baseline_1",
+            "start": 0,
+            "end": 450,
+            "event_count": 8
+          },
+          {
+            "name": "benign_baseline_2",
+            "start": 450,
+            "end": 900,
+            "event_count": 8
+          },
+          {
+            "name": "benign_baseline_3",
+            "start": 900,
+            "end": 1350,
+            "event_count": 8
+          },
+          {
+            "name": "benign_baseline_4",
+            "start": 1350,
+            "end": 1800,
+            "event_count": 6
+          }
+        ],
+        "false_alarm_zones": null,
+        "_notes": "No attack phases; uniform distribution of benign traffic across observation window"
+      },
+      "false_alarm_distribution": {
+        "type_1_unusual_port_benign_service": 1,
+        "type_2_high_volume_low_risk": 2,
+        "type_3_rare_duration_benign": 1
+      },
+      "expected_tier": 1,
+      "tier_notes": "No UNSW filtering required; purely procedural benign + false alarm generation"
     }
   ]
 }

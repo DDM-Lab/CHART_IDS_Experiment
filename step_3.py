@@ -161,6 +161,18 @@ def generate_malicious_events_step_3(
                     errors.append(f"Scenario {scenario_name} not found in templates")
                     continue
                 
+                # Get malicious count (check early, skip if none)
+                if malicious_count_per_scenario and scenario_name in malicious_count_per_scenario:
+                    mal_count = malicious_count_per_scenario[scenario_name]
+                else:
+                    mal_count = scenario_template.get('malicious_count', 11)
+                
+                # SKIP scenarios with no malicious events (e.g., No_Attack)
+                if mal_count == 0:
+                    print(f"    [SKIPPED] No malicious events to generate")
+                    malicious_events_per_scenario[scenario_name] = []
+                    continue
+                
                 # Filter UNSW data for this scenario
                 scenario_df = transformed_df[
                     transformed_df['scenario_name'] == scenario_name
@@ -173,12 +185,6 @@ def generate_malicious_events_step_3(
                 # Get tier classification and feature stats from Step 2
                 expected_tier = scenario_template.get('expected_tier', 1)
                 step2_stats = scenario_template.get('_step2_stats', {})
-                
-                # Get malicious count from parameter or template (backwards compatible)
-                if malicious_count_per_scenario and scenario_name in malicious_count_per_scenario:
-                    mal_count = malicious_count_per_scenario[scenario_name]
-                else:
-                    mal_count = scenario_template.get('malicious_count', 11)
                 
                 # Generate events (TIER 1 uses real data, TIER 2 adds parameterized)
                 if expected_tier == 1:

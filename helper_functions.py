@@ -253,7 +253,7 @@ def validate_attack_cat(attack_cat):
 # SCENARIOS DEFINITION (Shared across pipeline)
 # ============================================================
 
-SCENARIOS = ['WannaCry', 'Data_Theft', 'ShellShock', 'Netcat_Backdoor', 'passwd_gzip_scp']
+SCENARIOS = ['WannaCry', 'Data_Theft', 'ShellShock', 'Netcat_Backdoor', 'passwd_gzip_scp', 'No_Attack']
 
 
 # ============================================================
@@ -294,31 +294,44 @@ def validate_scenario_template(scenario_dict, scenario_index):
         if field not in scenario_dict:
             errors.append(f"  Scenario {scenario_index}: Missing required field '{field}'")
     
-    # Validate entry_point and target_asset structure
+    # Get scenario name and malicious_count for conditional validation
+    scenario_name = scenario_dict.get('scenario_name', 'Unknown')
+    malicious_count = scenario_dict.get('malicious_count', 0)
+    
+    # Validate entry_point and target_asset structure (null allowed for No_Attack)
     if 'entry_point' in scenario_dict:
         entry = scenario_dict['entry_point']
-        if not isinstance(entry, dict):
-            errors.append(f"  Scenario {scenario_index}: 'entry_point' must be dict, got {type(entry)}")
-        elif 'host' not in entry or 'subnet' not in entry:
-            errors.append(f"  Scenario {scenario_index}: 'entry_point' missing 'host' or 'subnet'")
+        if entry is not None:  # Allow null for No_Attack scenario
+            if not isinstance(entry, dict):
+                errors.append(f"  Scenario {scenario_index}: 'entry_point' must be dict, got {type(entry)}")
+            elif 'host' not in entry or 'subnet' not in entry:
+                errors.append(f"  Scenario {scenario_index}: 'entry_point' missing 'host' or 'subnet'")
+        elif malicious_count > 0:  # Null not allowed for attack scenarios
+            errors.append(f"  Scenario {scenario_index}: 'entry_point' cannot be null for attack scenario")
     
     if 'target_asset' in scenario_dict:
         target = scenario_dict['target_asset']
-        if not isinstance(target, dict):
-            errors.append(f"  Scenario {scenario_index}: 'target_asset' must be dict, got {type(target)}")
-        elif 'host' not in target or 'subnet' not in target:
-            errors.append(f"  Scenario {scenario_index}: 'target_asset' missing 'host' or 'subnet'")
+        if target is not None:  # Allow null for No_Attack scenario
+            if not isinstance(target, dict):
+                errors.append(f"  Scenario {scenario_index}: 'target_asset' must be dict, got {type(target)}")
+            elif 'host' not in target or 'subnet' not in target:
+                errors.append(f"  Scenario {scenario_index}: 'target_asset' missing 'host' or 'subnet'")
+        elif malicious_count > 0:  # Null not allowed for attack scenarios
+            errors.append(f"  Scenario {scenario_index}: 'target_asset' cannot be null for attack scenario")
     
-    # Validate key_attack_behaviors structure
+    # Validate key_attack_behaviors structure (null allowed for No_Attack)
     if 'key_attack_behaviors' in scenario_dict:
         behaviors = scenario_dict['key_attack_behaviors']
-        if not isinstance(behaviors, dict):
-            errors.append(f"  Scenario {scenario_index}: 'key_attack_behaviors' must be dict, got {type(behaviors)}")
-        else:
-            required_behaviors = ['initial_access', 'lateral_movement', 'payload_execution', 'data_exfiltration']
-            for behavior in required_behaviors:
-                if behavior not in behaviors:
-                    errors.append(f"  Scenario {scenario_index}: 'key_attack_behaviors' missing '{behavior}'")
+        if behaviors is not None:  # Allow null for No_Attack scenario
+            if not isinstance(behaviors, dict):
+                errors.append(f"  Scenario {scenario_index}: 'key_attack_behaviors' must be dict, got {type(behaviors)}")
+            else:
+                required_behaviors = ['initial_access', 'lateral_movement', 'payload_execution', 'data_exfiltration']
+                for behavior in required_behaviors:
+                    if behavior not in behaviors:
+                        errors.append(f"  Scenario {scenario_index}: 'key_attack_behaviors' missing '{behavior}'")
+        elif malicious_count > 0:  # Null not allowed for attack scenarios
+            errors.append(f"  Scenario {scenario_index}: 'key_attack_behaviors' cannot be null for attack scenario")
     
     # Validate unsw_filtering structure
     if 'unsw_filtering' in scenario_dict:

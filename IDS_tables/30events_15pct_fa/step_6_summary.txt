@@ -2,7 +2,7 @@
 STEP 6: FINAL IDS TABLE ASSEMBLY WITH PARAMETERIZED COUNTS
 ================================================================================
 
-Timestamp: 2026-04-19 10:50:33.725958
+Timestamp: 2026-04-19 11:09:47.789619
 Output Directory: IDS_tables\30events_15pct_fa
 Total Events Per Table: 30
 False Alarm Percentage: 15%
@@ -124,10 +124,33 @@ Time Range:
   Min: 7.5s
   Max: 1770.0s
 
+================================================================================
+Scenario: No_Attack
+================================================================================
+CSV Path: IDS_tables\30events_15pct_fa\No_Attack_30events.csv
+Row Count: 30
+Total Columns (metadata + flow): 30
+
+Metadata Columns (first 5):
+  1. _total_events_param: 30
+  2. _false_alarm_pct_param: 0.15
+  3. _malicious_count_param: 0
+  4. _benign_count_param: 26
+  5. _false_alarm_count_param: 4
+
+Label Distribution:
+  Malicious:  0 (  0.0%)
+  Benign: 26 ( 86.7%)
+  False Alarm:  4 ( 13.3%)
+
+Time Range:
+  Min: 11.3s
+  Max: 1780.7s
+
 
 ================================================================================
 FINAL SUMMARY
 ================================================================================
-Total Scenarios Processed: 5
-Successful CSVs: 5
+Total Scenarios Processed: 6
+Successful CSVs: 6
 Errors: 0
