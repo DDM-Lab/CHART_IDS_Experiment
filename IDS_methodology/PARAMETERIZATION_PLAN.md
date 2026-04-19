@@ -50,6 +50,8 @@ The IDS pipeline generates fixed-size tables:
    - All bins use global-safe rate (64%) so all scenarios work for any bin
    - Guard against impossible configs: `malicious_count + false_alarm_count > total_events_per_table` should never occur
    - Allow `benign_count` to reach zero (if FA rate hits max), but document this clearly
+   - Reject if `malicious_count = 0` (invalid - attacks require ≥1 malicious event)
+   - Allow `false_alarm_count = 0` (pure attack detection scenario) but warn user
 
 6. **Step-level implementations**:
    - Step 3: Use scenario's fixed `malicious_count` (no selection logic needed)
@@ -602,13 +604,25 @@ print(f"Output directory: {output_dir}")
 ```
 
 **Metadata columns** (Step 6 adds when writing CSVs - FIRST 5 columns):
-```python
-# Example output row structure (5 metadata + existing columns):
-# _total_events_param | _false_alarm_pct_param | _malicious_count_param | _benign_count_param | _false_alarm_count_param | ...existing columns...
-# 30                  | 0.15                   | 11                     | 14                  | 5                       | [flow_id, duration, bytes, ...]
 
+**Column Definitions** (positions 0-4):
+```python
+# Row structure: 5 metadata columns + existing 21+ flow data columns
+# Example: _total_events_param | _false_alarm_pct_param | ... | (original flow columns)
+#          30                   | 0.15                   | ... | [flow_id, src_ip, bytes, ...]
+```
+
+**Data Types** (native types for calculations):
+- `_total_events_param`: int (range: 18-45) - Total events config parameter
+- `_false_alarm_pct_param`: float 0.0-1.0 (range: 0.05-0.30) - FA percentage as decimal
+- `_malicious_count_param`: int (7, 9, or 11) - Malicious events in this scenario
+- `_benign_count_param`: int (range: 0+) - Benign events after remainder calculation
+- `_false_alarm_count_param`: int (range: 0+) - False alarms after rounding
+
+**Implementation**:
+```python
 def _add_metadata_columns(df, total_events, fa_pct, mal_count, ben_count, fa_count):
-    \"\"\"Insert 5 metadata columns at the beginning of dataframe\"\"\"
+    """Insert 5 metadata columns at beginning of dataframe"""
     metadata = pd.DataFrame({
         '_total_events_param': [total_events] * len(df),
         '_false_alarm_pct_param': [fa_pct] * len(df),
@@ -619,13 +633,70 @@ def _add_metadata_columns(df, total_events, fa_pct, mal_count, ben_count, fa_cou
     return pd.concat([metadata, df], axis=1)
 ```
 
-**Temporal architecture modification** for zero benign case:
+**Note**: All metadata columns are added FIRST before any flow columns. This ensures audit traceability while keeping original flow data accessible.
+
+**Temporal architecture modification** for edge cases (ben=0, fa=0):
+
+**Default Case** (benign > 0, false_alarm > 0):
+```
+Timeline (0-1800s):
+├── Baseline (0-300s): benign only, ~20% of benign_count
+├── Attack (300-900s): malicious events distributed in 2-3 phases
+└── Recovery (1200-1800s): benign + false alarms mixed
+```
+
+**Edge Case: benign_count = 0**:
+```
+Timeline (0-1800s):
+├── Baseline: SKIPPED (no benign events)
+├── Attack (300-900s): ALL malicious events here
+└── Recovery: FALSE ALARMS ONLY (no recovery benign traffic)
+Result: Sparse timeline, attack-focused. Step 6 should warn: "No baseline traffic."
+```
+
+**Edge Case: false_alarm_count = 0**:
+```
+Timeline (0-1800s):
+├── Baseline (0-300s): benign only
+├── Attack (300-900s): malicious events
+└── Recovery (1200-1800s): benign only (no FA injection)
+Result: Clean dataset, good for pure attack detection. Step 6 should warn: "No false alarms for triage training."
+```
+
+**Edge Case: Both benign=0 AND false_alarm=0**:
+```
+Should be REJECTED in main.py validation (caught by per-scenario checks)
+Timeline would be: ONLY malicious events, invalid for typical SIE scenario
+```
+
+**Implementation in Step 6**:
 ```python
 def _build_temporal_architecture(scenario_name, mal_count, ben_count, fa_count, total_duration=1800):
-    \"\"\"
-    Build temporal phases accounting for zero benign/FA cases.
+    """Build temporal phases accounting for zero benign/FA cases"""
+    phases = []
     
-    STANDARD (ben > 0, fa > 0):
+    if ben_count > 0:
+        # Standard: include baseline phase
+        benign_baseline_count = max(1, ben_count // 5)
+        benign_recovery_count = ben_count - benign_baseline_count
+        phases.extend([
+            {'name': 'baseline', 'start': 0, 'end': 300, 'event_count': benign_baseline_count},
+            {'name': 'attack_phase_1', 'start': 300, 'end': 500, 'event_count': mal_count // 3},
+            {'name': 'attack_phase_2', 'start': 500, 'end': 700, 'event_count': mal_count // 3},
+            {'name': 'attack_phase_3', 'start': 700, 'end': 900, 'event_count': mal_count - (mal_count // 3) * 2},
+            {'name': 'recovery', 'start': 1200, 'end': 1800, 'event_count': benign_recovery_count + fa_count}
+        ])
+    else:
+        # Edge case: benign=0, allocate ALL malicious to attack window
+        phases.extend([
+            {'name': 'attack_phase_1', 'start': 300, 'end': 500, 'event_count': mal_count // 3},
+            {'name': 'attack_phase_2', 'start': 500, 'end': 700, 'event_count': mal_count // 3},
+            {'name': 'attack_phase_3', 'start': 700, 'end': 900, 'event_count': mal_count - (mal_count // 3) * 2},
+            {'name': 'recovery_fas', 'start': 1200, 'end': 1800, 'event_count': fa_count}  # FAs only
+        ])
+    
+    return {'scenario_name': scenario_name, 'total_duration': total_duration, 'phases': phases}
+```
       Phase 0: benign_baseline (20% of ben events, 0-300s)
       Phase 1-3: attack_phases (mal events distributed per scenario, 300-1200s)
       Phase 4: benign_recovery (80% ben + all fa, 1200-1800s)
@@ -910,43 +981,36 @@ def main():
     print(f"Configuration: total={total_events_per_table}, FA_bin={false_alarm_bin} ({false_alarm_pct*100:.0f}%)")
     print(f"  Computed FA_count: {false_alarm_count} (applied to all scenarios)")
     
-    # ========== SECTION B: Per-scenario computation ==========
-    # Build dicts to store per-scenario values
-    malicious_count_per_scenario = {}
-    benign_count_per_scenario = {}
-    scenario_validation_errors = []
+    # ========== SECTION B: Validate configuration ==========
+    # Use validation function to check all scenarios
+    is_valid, errors, warnings, malicious_count_per_scenario, benign_count_per_scenario = validate_configuration(
+        templates_data,
+        total_events_per_table,
+        false_alarm_bin,
+        false_alarm_pct
+    )
     
-    for scenario in templates_data["scenarios"]:
-        scenario_name = scenario["scenario_name"]
-        mal_count = scenario["malicious_count"]
-        max_fa_pct = scenario["max_false_alarm_pct"]
-        
-        # Compute per-scenario benign count (as remainder)
-        ben_count = total_events_per_table - mal_count - false_alarm_count
-        
-        # Validate this scenario's configuration
-        if ben_count < 0:
-            scenario_validation_errors.append(
-                f"{scenario_name}: benign would be negative ({ben_count}). "
-                f"Cannot fit mal({mal_count}) + fa({false_alarm_count}) in total({total_events_per_table})"
-            )
-        
-        if ben_count == 0:
-            print(f"  [WARN] {scenario_name}: benign_count=0 (FA rate at maximum)")
-        
-        # Store for later use
-        malicious_count_per_scenario[scenario_name] = mal_count
-        benign_count_per_scenario[scenario_name] = max(0, ben_count)
+    # Print warnings (non-blocking)
+    if warnings:
+        print("\n[WARN] Configuration warnings:")
+        for warning in warnings:
+            print(f"  - {warning}")
     
-    # Check for validation errors
-    if scenario_validation_errors:
-        print("ERROR: Configuration invalid for one or more scenarios:")
-        for error in scenario_validation_errors:
+    # Check for errors (blocking)
+    if not is_valid:
+        print("\n[ERROR] Configuration invalid for one or more scenarios:")
+        for error in errors:
             print(f"  - {error}")
         print("\nRecommendations:")
         print(f"  - Increase total_events_per_table (currently {total_events_per_table})")
-        print(f"  - Decrease false_alarm_bin (currently {false_alarm_bin} = {false_alarm_pct*100:.0f}%)")
-        raise ValueError("Configuration invalid")
+        print(f"  - Decrease false_alarm_bin (currently {false_alarm_bin} = {false_alarm_pct*100:.0f}%) to a more conservative option")
+        raise ValueError("Configuration validation failed")
+    
+    # Configuration is valid
+    print(f"\n[OK] Configuration VALID for all 5 scenarios")
+    print(f"  total_events_per_table: {total_events_per_table}")
+    print(f"  false_alarm_bin: {false_alarm_bin} ({false_alarm_pct*100:.0f}%)")
+    print(f"  false_alarm_count: {false_alarm_count}")
     
     # ========== SECTION C: Call Steps with computed values ==========
     
@@ -1016,16 +1080,22 @@ def main():
 3. **Output directory created from parameters**
    - Pattern: `IDS_tables/{total}events_{fa_pct}pct_fa/`
    - Example: `IDS_tables/30events_15pct_fa/`
+   - Created in main.py BEFORE calling steps (see Section 7)
 
-4. **Validation happens in main.py**
-   - Before any steps run
-   - Clear error messages if config is impossible
-   - Stops pipeline if errors found
-
-5. **Steps receive EXACTLY what they need**
-   - Step 4 gets `benign_count_per_scenario` dict
-   - Step 5 gets single `false_alarm_count` scalar
-   - Step 6 gets both dicts + scalar
+4. **CSV Output Naming Convention** (**GAP #10: RESOLVED**)
+   - **File naming**: Scenario name only (parameter info in metadata columns + directory)
+   - Format: `{scenario_name}.csv`
+   - Examples:
+     - `WannaCry.csv`
+     - `Data_Theft.csv`
+     - `ShellShock.csv`
+     - `Netcat_Backdoor.csv`
+     - `passwd_gzip_scp.csv`
+   - Full path: `IDS_tables/30events_15pct_fa/WannaCry.csv`
+   - Rationale: Parameter configuration is stored in:
+     1. Directory name (`30events_15pct_fa`)
+     2. Metadata columns (first 5 columns in CSV)
+     3. This keeps scenario names clean for scripting/loading
 
 ---
 
@@ -1091,6 +1161,17 @@ def assemble_30_events_step_6(
 
 Before ANY scenario computation, main.py validates user parameters:
 
+**Validation Order** (fail-fast approach):
+1. Validate `total_events_per_table` range (18-45)
+2. Validate `false_alarm_bin` exists and is valid
+3. Convert bin to false_alarm_pct
+4. **For each scenario**: Check if configuration is feasible
+   - Compute benign_count = total - malicious - false_alarm
+   - Reject if benign_count < 0 (config impossible)
+   - Warn if benign_count = 0 (edge case)
+   - Reject if malicious_count = 0 (not a valid attack)
+   - Warn if false_alarm_count = 0 (no triage training)
+
 ```python
 # ============================================================
 # VALIDATION STEP A: Bin Lookup
@@ -1108,82 +1189,183 @@ def validate_false_alarm_bin(bin_name):
 # ============================================================
 # VALIDATION STEP B: Per-Scenario Feasibility Check
 # ============================================================
-def validate_per_scenario(total_events, false_alarm_pct, scenario):
-    """Check if benign_count ≥ 0 for this scenario"""
+def validate_per_scenario(total_events, false_alarm_pct, scenario, scenario_name):
+    """Check if configuration is feasible for this scenario"""
     mal_count = scenario["malicious_count"]
     fa_count = round(total_events * false_alarm_pct)
     ben_count = total_events - mal_count - fa_count
     
-    # Feasibility rules:
-    # - ben_count == 0 is allowed BUT warns
-    # - ben_count < 0 is INVALID (error + stop entire config)
+    errors = []
+    warnings = []
+    
+    # Rule 1: Malicious count must be >= 1 (attack scenario)
+    if mal_count <= 0:
+        errors.append(
+            f"Scenario '{scenario_name}': malicious_count={mal_count} (INVALID). "
+            f"Attacks require ≥1 malicious event. Check zero_day_templates.json."
+        )
+    
+    # Rule 2: Benign count cannot be negative
     if ben_count < 0:
-        return False, ben_count
-    if ben_count == 0:
-        print(f"⚠️  WARNING: {scenario['name']} will have benign_count=0. "
-              f"Temporal synthesis may skip normal traffic phase.")
-    return True, ben_count
+        errors.append(
+            f"Scenario '{scenario_name}': benign_count would be {ben_count} (NEGATIVE). "
+            f"Configuration: total({total_events}) - malicious({mal_count}) - false_alarm({fa_count}) = {ben_count}. "
+            f"Try: a) increase total_events to >{mal_count + fa_count}, or b) use more conservative false_alarm_bin."
+        )
+    
+    # Rule 3: Benign count zero is allowed but warn
+    if ben_count == 0 and ben_count >= 0:  # Only warn if not negative
+        warnings.append(
+            f"Scenario '{scenario_name}': benign_count=0. "
+            f"No baseline traffic phase. Temporal architecture will skip recovery phase."
+        )
+    
+    # Rule 4: False alarm count zero is allowed but warn
+    if fa_count == 0:
+        warnings.append(
+            f"Scenario '{scenario_name}': false_alarm_count=0. "
+            f"No false positives for triage training. Pure attack detection scenario."
+        )
+    
+    return errors, warnings, max(0, ben_count)
 
 # ============================================================
-# VALIDATION STEP C: Execute All Checks
+# VALIDATION STEP C: Execute All Checks & Build Dicts
 # ============================================================
-def main():
-    # User provides only TWO parameters:
-    total_events_per_table = 30
-    false_alarm_bin = "standard"  # User selects from bin names
+def validate_configuration(templates_data, total_events, false_alarm_bin, false_alarm_pct):
+    """
+    Validate configuration against all scenarios.
     
-    # Step 1: Validate bin exists (prevents typos)
-    validate_false_alarm_bin(false_alarm_bin)
-    
-    # Step 2: Convert bin to percentage
-    false_alarm_pct = FALSE_ALARM_BINS[false_alarm_bin]["pct"]
-    print(f"Using false_alarm_bin='{false_alarm_bin}' ({false_alarm_pct:.0%})")
-    
-    # Step 3: Load scenario definitions from templates
-    with open("templates/zero_day_templates.json", 'r') as f:
-        templates_data = json.load(f)
-    
-    # Step 4: Check EVERY scenario
+    Returns: (is_valid, errors, warnings, malicious_count_per_scenario, benign_count_per_scenario)
+    """
+    all_errors = []
+    all_warnings = []
+    malicious_count_per_scenario = {}
     benign_count_per_scenario = {}
+    
     for scenario in templates_data["scenarios"]:
-        scenario_name = scenario["name"]
-        is_valid, ben_count = validate_per_scenario(
-            total_events_per_table,
+        scenario_name = scenario["scenario_name"]
+        errors, warnings, ben_count = validate_per_scenario(
+            total_events,
             false_alarm_pct,
-            scenario
+            scenario,
+            scenario_name
         )
         
-        if is_valid:
+        # Collect all errors and warnings
+        all_errors.extend(errors)
+        all_warnings.extend(warnings)
+        
+        # Store per-scenario counts if valid
+        if not errors:  # Only store if no errors for this scenario
+            malicious_count_per_scenario[scenario_name] = scenario["malicious_count"]
             benign_count_per_scenario[scenario_name] = ben_count
-        else:
-            # ❌ INVALID: Config doesn't work for all scenarios
-            raise ValueError(
-                f"\n❌ INVALID CONFIGURATION:\n"
-                f"  total_events={total_events_per_table}\n"
-                f"  false_alarm_bin='{false_alarm_bin}' ({false_alarm_pct:.0%})\n\n"
-                f"Problem: {scenario_name}\n"
-                f"  - malicious_count = {scenario['malicious_count']}\n"
-                f"  - false_alarm_count = {round(total_events_per_table * false_alarm_pct)}\n"
-                f"  - benign_count = {ben_count} ❌ (NEGATIVE!)\n\n"
-                f"Solutions:\n"
-                f"  1. Increase total_events to > {scenario['malicious_count'] + round(total_events_per_table * false_alarm_pct)}\n"
-                f"  2. Use a LOWER false_alarm_bin (more conservative)\n\n"
-                f"Hint: WannaCry requires total ≥ 22 (11 malicious + 11 false alarms)"
-            )
     
-    # ✅ All scenarios valid - proceed to steps
-    print(f"✅ Configuration VALID for all 5 scenarios")
-    return benign_count_per_scenario  # Passed to Step 4
+    # Determine if configuration is valid
+    is_valid = len(all_errors) == 0
+    
+    return is_valid, all_errors, all_warnings, malicious_count_per_scenario, benign_count_per_scenario
 ```
 
-### 5.2 Validation Rules Summary
+### 5.4 False Alarm Count Bounds & Special Cases (**GAP #8: RESOLVED**)
 
-| Context | Rule | Failure Mode | Error Message |
-|---------|------|--------------|---------------|
-| **Bin Validation** | `false_alarm_bin` must exist in FALSE_ALARM_BINS | Typo in user input | "Invalid bin {x}. Available: ..." |
-| **Per-Scenario Check** | For each scenario: `benign_count ≥ 0` | Total events too low | "benign_count = {x} (NEGATIVE)" |
-| **Config-Wide Rule** | If ANY scenario fails: reject entire config | User ignorant of constraints | Clear error with suggestions |
-| **Edge Case: ben=0** | Allowed, but issue warning | Temporal phase skipped | "⚠️ benign_count=0. Synthese may skip..." |
+**False Alarm Minimum Bound**: NO MINIMUM (allow even 0)
+
+**Why no minimum**:
+- Pure attack detection scenarios (false_alarm_count=0) are valid use cases
+- IDS evaluations should support both:
+  - Attack detection focus (minimal false alarms)
+  - Triage training focus (many false alarms)
+- User should have choice
+
+**When false_alarm_count=0**:
+- Configuration is ALLOWED (valid from validation perspective)
+- Configuration is WARNED (main.py and Step 5 print warning)
+- Warning message: "No false alarms for triage training. Pure attack detection scenario."
+- Step 5 should skip or handle gracefully (no false alarm generation)
+
+**When false_alarm_count=1**:
+- Minimum practical value for type distribution
+- 1 false alarm → Type 3 only (unusual duration anomaly)
+
+**When false_alarm_count=2-4**:
+- Type distribution uses floor/ceil logic
+- Example (fa=2): Type 1=1, Type 2=0, Type 3=1
+- Example (fa=3): Type 1=1, Type 2=1, Type 3=1
+
+**Maximum false_alarm_count**:
+- No hard maximum, but practical upper limit depends on total_events_per_table
+- At total=45, maximum practical: false_alarm_count ~= 15-18 (leaves room for malicious+benign)
+
+---
+
+### 5.5 False Alarm Type Distribution Algorithm (**GAP #9: RESOLVED**)
+
+**Standard Distribution Mode** ("balanced" - default):
+```
+Goal: Distribute false_alarm_count across Type 1, Type 2, Type 3
+Ratio: 2:2:1 (Type 1 : Type 2 : Type 3)
+
+Algorithm:
+  Type 3 always gets: 1 event (reserved for "rare duration" anomaly)
+  Remaining after Type 3: remaining = false_alarm_count - 1
+  Type 1 gets: floor(remaining / 2)
+  Type 2 gets: remaining - Type1  (absorbs remainder)
+
+Examples:
+  fa_count=0:  T1=0, T2=0, T3=0    (all zero)
+  fa_count=1:  T1=0, T2=0, T3=1    (Type 3 only)
+  fa_count=2:  T1=0, T2=1, T3=1    (Type 2+3)
+  fa_count=3:  T1=1, T2=1, T3=1    (balanced)
+  fa_count=4:  T1=1, T2=2, T3=1    (T2 absorbs 1)
+  fa_count=5:  T1=2, T2=2, T3=1    (balanced 2:2:1)
+  fa_count=6:  T1=2, T2=3, T3=1    (T2 absorbs 1)
+  fa_count=10: T1=4, T2=5, T3=1    (T2 absorbs remainder)
+```
+
+**Type Definitions**:
+- **Type 1** (Unusual port + benign service): DNS on port 56789, SSH on 8080, etc.
+- **Type 2** (High volume + benign service): 10x normal bytes, 5x normal packets
+- **Type 3** (Rare duration + benign service): 10x normal session duration
+
+**Implementation**:
+```python
+def distribute_false_alarms(false_alarm_count, fa_type_ratio_mode="balanced"):
+    """
+    Distribute false_alarm_count across 3 anomaly types.
+    
+    Args:
+        false_alarm_count: Total FAs to generate
+        fa_type_ratio_mode: Distribution strategy (balanced, port_heavy, volume_heavy, duration_heavy)
+    
+    Returns:
+        {'type_1': count1, 'type_2': count2, 'type_3': count3}
+    """
+    if false_alarm_count == 0:
+        return {'type_1': 0, 'type_2': 0, 'type_3': 0}
+    
+    if fa_type_ratio_mode == "balanced":
+        # 2:2:1 ratio, Type 3 singleton, Type 2 absorbs remainder
+        type_3 = 1 if false_alarm_count >= 1 else 0
+        remaining = false_alarm_count - type_3
+        type_1 = remaining // 2
+        type_2 = remaining - type_1
+        return {'type_1': type_1, 'type_2': type_2, 'type_3': type_3}
+    
+    # Other modes (port_heavy, volume_heavy, duration_heavy) follow similar logic
+    # with different preservation ratios
+```
+
+**Note**: Type 2 ALWAYS absorbs remainder (deterministic, no randomness)
+
+| Context | Rule | Failure Mode | Notes |
+|---------|------|--------------|-------|
+| **Bin Validation** | `false_alarm_bin` must exist in FALSE_ALARM_BINS | Invalid bin name | "Invalid bin {x}. Available: ..." |
+| **Total Events** | `18 <= total_events_per_table <= 45` | Out-of-range input | "total_events must be 18-45, got {x}" |
+| **Per-Scenario** | For each scenario: `benign_count >= 0` | Impossible configuration | "benign_count would be negative ({ben_count}). Try: increase total_events or decrease false_alarm_bin" |
+| **Edge Case: ben=0** | Allowed but warn | Sparse dataset | "benign_count=0. No baseline traffic phase. Recovery will be FAs only." |
+| **Edge Case: fa=0** | Allowed but warn | No triage training | "false_alarm_count=0. Pure attack detection scenario. No false positives for training." |
+| **Edge Case: mal=0** | REJECT immediately | Invalid attack scenario | "malicious_count=0 (check zero_day_templates.json). Attacks require >=1 malicious event." |
 
 ### 5.3 Design Principle: No Per-Scenario Adjustment
 
@@ -1294,12 +1476,76 @@ if false_alarm_count < 3:
 
 ---
 
-## BACKWARD COMPATIBILITY
+## BACKWARD COMPATIBILITY (**GAP #13: RESOLVED**)
+
+**Key Decision**: BOTH config files serve different purposes and must coexist
+
+**Architecture**:
+- **`global_constraints.json`** (KEEP - unchanged):
+  - Purpose: Define network topology (3 subnets, 15 hosts, routing constraints)
+  - Purpose: Define attack phases structure (5-phase temporal architecture)
+  - Purpose: Define false alarm taxonomy (Type 1/2/3 categories)
+  - NOT changing: Phase definitions, network topology, routing rules
+  - Examples: `"subnet_1": {...}`, `"temporal_phases": [...]`, `"false_alarm_types": {...}`
+
+- **`zero_day_templates.json`** (UPDATE - add malicious_count):
+  - Purpose: NEW - Add scenario-specific malicious event counts (7, 9, or 11)
+  - Purpose: EXISTING - Attack descriptions, UNSW filtering rules, behavioral phases
+  - NEW field: `"malicious_count"` per scenario (WannaCry=11, Data_Theft=9, etc.)
+  - NEW field: `"max_false_alarm_pct"` per scenario (optional reference, not enforced due to binning)
 
 **Migration Path**:
-- Current defaults remain unchanged (total=30, malicious 35%, benign 50%, false alarm 15%)
-- Existing `global_constraints.json` works with updated code if percentages are converted to counts
-- Step files maintain ability to run with old-style string-based configs (with deprecation warning)
+1. NO migration needed - adding new field to templates, not modifying global_constraints
+2. Update `zero_day_templates.json` to include `malicious_count` for each scenario
+3. Update `global_constraints.json` to optionally reference `scenario_malicious_events` (for reference)
+4. Existing code that reads global_constraints continues to work unchanged
+5. NEW Step 3/4/5 code reads from templates instead
+
+**Why both files**:
+- Separation of concerns: Topology (global) vs. Attack details (scenario-specific)
+- Granularity: Can update attack strategies without touching network design
+- Reusability: Same network topology can be used with different attack scenarios
+
+---
+
+## HELPER FUNCTIONS (**GAP #11: RESOLVED**)
+
+**Recommended Addition to `helper_functions.py`**:
+
+```python
+def get_scenario_template(templates_data, scenario_name):
+    """
+    Lookup a scenario template by name.
+    
+    Prevents repeated code pattern in Steps 3-5:
+        for scenario in templates_data['scenarios']:
+            if scenario['scenario_name'] == scenario_name:
+                return scenario
+    
+    Args:
+        templates_data: Parsed zero_day_templates.json dict
+        scenario_name: Scenario name (e.g., 'WannaCry')
+    
+    Returns:
+        Scenario dict with malicious_count, filtering rules, etc.
+    
+    Raises:
+        ValueError: If scenario not found
+    """
+    for scenario in templates_data.get('scenarios', []):
+        if scenario.get('scenario_name') == scenario_name:
+            return scenario
+    raise ValueError(f"Scenario '{scenario_name}' not found in templates")
+
+# Usage in Step 3:
+scenario_template = get_scenario_template(templates_data, scenario_name)
+malicious_count = scenario_template['malicious_count']
+```
+
+**Benefits**:
+- DRY principle: Centralize scenario lookup logic
+- Error handling: Consistent "not found" errors across steps
+- Maintainability: If lookup logic changes, update in one place
 
 ---
 
