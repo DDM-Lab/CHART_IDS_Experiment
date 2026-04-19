@@ -125,6 +125,15 @@ def main():
     # Generate 10-11 attack events using real data (TIER 1) or + variations (TIER 2)
     # Ensure logical attack progression and valid network structure
     # Output: malicious events (per scenario)
+    #
+    # CONFIG FILE DEPENDENCIES:
+    #   - templates_path (zero_day_templates.json):
+    #     * Provides scenario-specific malicious_count (e.g. 11 for WannaCry, 9 for Data_Theft)
+    #     * NEW FIELD: malicious_count added during parameterization
+    #   - global_constraints_path (global_constraints.json):
+    #     * Provides temporal_architecture (phases for timestamp assignment: 300-900s)
+    #     * Provides network_topology (for host assignment validation)
+    #     * Provides tiered_synthesis_framework (TIER 1/2/3 fallback rules)
     # ============================================================
     
     print(f"\nRunning Step 3: generating malicious events...")
@@ -147,6 +156,14 @@ def main():
     # Generate 15 normal traffic events (HTTP, DNS, SSH, etc.)
     # Use realistic feature ranges and valid host/subnet combinations
     # Output: benign events (per scenario)
+    #
+    # CONFIG FILE DEPENDENCIES:
+    #   - templates_path (zero_day_templates.json):
+    #     * Provides scenario-specific benign_count (derived from total - malicious - fa)
+    #     * Provides feature_constraints for realistic traffic generation
+    #   - global_constraints_path (global_constraints.json):
+    #     * Provides network_topology (enforces routing constraints: no direct User ↔ Operational)
+    #     * Provides output_schema (column names and validation)
     # ============================================================
     
     print(f"\nRunning Step 4: generating benign events...")
@@ -169,6 +186,15 @@ def main():
     # Generate 5 suspicious-looking but benign events
     # UNSW-grounded, scenario-independent, 3 types
     # Output: false alarm events (per scenario)
+    #
+    # CONFIG FILE DEPENDENCIES:
+    #   - templates_path (zero_day_templates.json):
+    #     * Provides scenario-specific false_alarm_count (parameterized value)
+    #     * Provides feature_constraints for realistic anomaly injection
+    #   - global_constraints_path (global_constraints.json):
+    #     * Provides false_alarm_taxonomy (3 types: unusual_port, high_volume, rare_duration)
+    #     * Provides temporal_architecture (isolation zones: 600-700s, 1200-1300s, 1400-1500s)
+    #     * Provides network_topology (enforces valid host/subnet assignments)
     # ============================================================
     
     print(f"\nRunning Step 5: generating false alarm events...")
@@ -191,6 +217,15 @@ def main():
     # Combine all events, assign timestamps using phase structure
     # Sort chronologically and validate final dataset
     # Output: {scenario}_30_events.csv
+    #
+    # CONFIG FILE DEPENDENCIES:
+    #   - templates_path (zero_day_templates.json):
+    #     * Provides all pre-computed event counts (malicious, benign, false_alarm)
+    #     * Provides scenario-specific metadata for validation
+    #   - global_constraints_path (global_constraints.json):
+    #     * Provides temporal_architecture (phase structure for 1800s window)
+    #     * Provides output_schema (final column names and format)
+    #     * Provides validation_checkpoints (sanity check rules)
     # ============================================================
     
     print(f"\nRunning Step 6: assembling 30-event tables with temporal ordering...")
