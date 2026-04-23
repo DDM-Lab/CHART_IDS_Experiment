@@ -353,7 +353,7 @@
   
   "unsw_dataset_reference": {
     "original_source": "UNSW-NB15",
-    "original_path": "C:\\Users\\groessli\\Documents\\GitHub\\CHART_IDS_Experiment\\IDSD_Datasets\\UNSW_NB15_training-set(in).csv",
+    "original_path": "c:\\Users\\groessli\\Documents\\GitHub\\CHART_IDS_Experiment\\IDS_Datasets\\UNSW_NB15_training-set(in).csv",
     "transformed_dataset": "UNSW_NB15_transformed.csv",
     "transformation_method": "Pre-Step schema mapping (Gap 6: IP→host mapping, column alignment, feature aggregation)",
     "mapping_specification": "See dataset_mapping.json for explicit column-level mapping (UNSW 45 columns → IDS 21 columns); includes identity mappings, aggregations, generated columns, inferred columns, and dropped features",

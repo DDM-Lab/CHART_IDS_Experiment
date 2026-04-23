@@ -137,13 +137,41 @@ def filter_scenario_data(df, scenario_name, unsw_filters):
     return filtered_df
 
 
-def get_standard_phases():
+def get_standard_phases(global_constraints):
     """
-    Return standard phase schedule for all scenarios.
+    Return standard phase schedule from global_constraints.json.
+    
+    Args:
+        global_constraints (dict): Global constraints dict with temporal_architecture_principles
     
     Returns:
-        list: Phase definitions
+        list: Phase definitions with standardized structure
     """
+    try:
+        # Read from global_constraints if available
+        if 'temporal_architecture_principles' in global_constraints:
+            phase_structure = global_constraints['temporal_architecture_principles'].get('phase_structure', {})
+            phases = []
+            
+            # Convert phase_structure to standard format
+            for phase_name, phase_info in phase_structure.items():
+                if isinstance(phase_info, dict) and 'timeband_seconds' in phase_info:
+                    # Parse "0-300" format
+                    timeband = phase_info['timeband_seconds'].split('-')
+                    if len(timeband) == 2:
+                        phases.append({
+                            "name": phase_name,
+                            "start": int(timeband[0]),
+                            "end": int(timeband[1]),
+                            "event_count": phase_info.get('event_count', '').split('-')[0] if '-' in str(phase_info.get('event_count', '')) else 6
+                        })
+            
+            if phases:
+                return phases
+    except Exception as e:
+        print(f"  Warning: Could not read phases from global_constraints ({str(e)}). Using defaults.")
+    
+    # Fallback to hardcoded defaults if JSON read fails
     return [
         {"name": "benign_baseline", "start": 0, "end": 300, "event_count": 6},
         {"name": "attack_phase_1", "start": 300, "end": 600, "event_count": 3},
@@ -185,6 +213,15 @@ def process_step_2(
         templates = load_templates(templates_path)
     except Exception as e:
         raise ValueError(f"Failed to load templates: {e}")
+    
+    # Load global constraints
+    global_constraints = {}
+    try:
+        with open(constraints_path, 'r') as f:
+            global_constraints = json.load(f)
+        print(f"Loaded global constraints from {constraints_path}")
+    except Exception as e:
+        print(f"Warning: Could not load global_constraints ({str(e)}). Proceeding with defaults.")
     
     # Load transformed CSV
     try:
@@ -261,7 +298,7 @@ def process_step_2(
             
             # Update template with computed values
             templates['scenarios'][scenario_idx]['expected_tier'] = tier
-            templates['scenarios'][scenario_idx]['temporal_architecture']['phases'] = get_standard_phases()
+            templates['scenarios'][scenario_idx]['temporal_architecture']['phases'] = get_standard_phases(global_constraints)
             templates['scenarios'][scenario_idx]['false_alarm_distribution'] = {
                 "type_1_unusual_port_benign_service": 2,
                 "type_2_high_volume_low_risk": 2,

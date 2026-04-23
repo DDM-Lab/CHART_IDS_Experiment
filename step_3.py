@@ -20,7 +20,7 @@ from helper_functions import (
 
 
 # ============================================================
-# PHASE DEFINITIONS & FEATURE CONSTRAINTS PER SCENARIO
+# PHASE DEFINITIONS PER SCENARIO (Feature generation uses scenario templates)
 # ============================================================
 
 PHASE_TIMELINE = {
@@ -59,44 +59,6 @@ SCENARIO_PHASES = {
         'description': 'System Access → File Access → Compression → SCP Transfer',
         'port_primary': 22,  # SSH/SCP
         'byte_trend': 'moderate',  # File transfer
-    },
-}
-
-FEATURE_CONSTRAINTS = {
-    'WannaCry': {
-        'duration_range': (0.05, 2.0),
-        'bytes_range': (200, 10000),
-        'packets_range': (5, 100),
-        'rate_scale': 1.5,  # High-frequency scanning
-        'enforce_dport': 445,
-    },
-    'Data_Theft': {
-        'duration_range': (5, 300),
-        'bytes_range': (100000, 100000000),
-        'packets_range': (50, 5000),
-        'rate_scale': 1.0,
-        'enforce_dport': [21, 22],
-    },
-    'ShellShock': {
-        'duration_range': (0.05, 5),
-        'bytes_range': (500, 50000),
-        'packets_range': (5, 500),
-        'rate_scale': 1.2,
-        'enforce_dport': 80,
-    },
-    'Netcat_Backdoor': {
-        'duration_range': (1, 300),
-        'bytes_range': (100, 10000),
-        'packets_range': (2, 100),
-        'rate_scale': 0.8,
-        'enforce_dport': None,  # High-numbered ephemeral
-    },
-    'passwd_gzip_scp': {
-        'duration_range': (5, 60),
-        'bytes_range': (100000, 10000000),
-        'packets_range': (20, 1000),
-        'rate_scale': 0.9,
-        'enforce_dport': 22,
     },
 }
 

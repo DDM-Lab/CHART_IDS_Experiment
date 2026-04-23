@@ -243,60 +243,37 @@ Step 6: Assembling final IDS tables with temporal ordering...
 
   Processing scenario: WannaCry
     Malicious: 11, Benign: 15, False Alarms: 4
-    DEBUG: Found 0 attack phases, 5 benign phases
-    DEBUG: Malicious events: 11, Benign events: 15, False alarms: 4
-    [FAIL] Validation failed: ['Expected ~30 events, got 19', 'Malicious count 0 != expected 11']
+    [OK] Validation passed
     [OK] CSV written: IDS_tables\30events_15pct_fa\WannaCry_30events.csv
 
   Processing scenario: Data_Theft
     Malicious: 9, Benign: 17, False Alarms: 4
-    DEBUG: Found 0 attack phases, 5 benign phases
-    DEBUG: Malicious events: 9, Benign events: 17, False alarms: 4
-    [FAIL] Validation failed: ['Expected ~30 events, got 21', 'Malicious count 0 != expected 9']
+    [OK] Validation passed
     [OK] CSV written: IDS_tables\30events_15pct_fa\Data_Theft_30events.csv
 
   Processing scenario: ShellShock
     Malicious: 9, Benign: 17, False Alarms: 4
-    DEBUG: Found 0 attack phases, 5 benign phases
-    DEBUG: Malicious events: 9, Benign events: 17, False alarms: 4
-    [FAIL] Validation failed: ['Expected ~30 events, got 21', 'Malicious count 0 != expected 9']
+    [OK] Validation passed
     [OK] CSV written: IDS_tables\30events_15pct_fa\ShellShock_30events.csv
 
   Processing scenario: Netcat_Backdoor
     Malicious: 7, Benign: 19, False Alarms: 4
-    DEBUG: Found 0 attack phases, 5 benign phases
-    DEBUG: Malicious events: 7, Benign events: 19, False alarms: 4
-    [FAIL] Validation failed: ['Expected ~30 events, got 23', 'Malicious count 0 != expected 7']
+    [OK] Validation passed
     [OK] CSV written: IDS_tables\30events_15pct_fa\Netcat_Backdoor_30events.csv
 
   Processing scenario: passwd_gzip_scp
     Malicious: 7, Benign: 19, False Alarms: 4
-    DEBUG: Found 0 attack phases, 5 benign phases
-    DEBUG: Malicious events: 7, Benign events: 19, False alarms: 4
-    [FAIL] Validation failed: ['Expected ~30 events, got 23', 'Malicious count 0 != expected 7']
+    [OK] Validation passed
     [OK] CSV written: IDS_tables\30events_15pct_fa\passwd_gzip_scp_30events.csv
 
   Processing scenario: No_Attack
     Malicious: 0, Benign: 26, False Alarms: 4
-    DEBUG: Found 0 attack phases, 4 benign phases
-    DEBUG: Malicious events: 0, Benign events: 26, False alarms: 4
     [OK] Validation passed
     [OK] CSV written: IDS_tables\30events_15pct_fa\No_Attack_30events.csv
 
 [OK] Step 6 completed
   Report: IDS_tables\30events_15pct_fa\step_6_summary.txt
-
-[WARN] Step 6 completed with warnings/errors:
-  -   WannaCry: Expected ~30 events, got 19
-  -   WannaCry: Malicious count 0 != expected 11
-  -   Data_Theft: Expected ~30 events, got 21
-  -   Data_Theft: Malicious count 0 != expected 9
-  -   ShellShock: Expected ~30 events, got 21
-  -   ShellShock: Malicious count 0 != expected 9
-  -   Netcat_Backdoor: Expected ~30 events, got 23
-  -   Netcat_Backdoor: Malicious count 0 != expected 7
-  -   passwd_gzip_scp: Expected ~30 events, got 23
-  -   passwd_gzip_scp: Malicious count 0 != expected 7
+[OK] Step 6 completed successfully
 
   Generated CSV files:
     - IDS_tables\30events_15pct_fa\WannaCry_30events.csv

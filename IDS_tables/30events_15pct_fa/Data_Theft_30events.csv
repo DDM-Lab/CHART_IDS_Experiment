@@ -1,31 +1,31 @@
 id,_total_events_param,_false_alarm_pct_param,_malicious_count_param,_benign_count_param,_false_alarm_count_param,timestamp,src_host,dst_host,src_subnet,dst_subnet,proto,sport,dport,service,duration,bytes,packets,sttl,dttl,state,sloss,dloss,ct_src_dport_ltm,ct_dst_src_ltm,attack_cat,label,_unsw_row_id,scenario_name,_source,phase
-1,30,0.15,9,17,4,7.50322656680008,Enterprise2,external_7,Subnet 2 (Enterprise),External,tcp,46248,21,ftp,5.0,100000,50,31,29,FIN,7,13,1,3,Normal,Benign,8326,Data_Theft,UNSW_benign,
-2,30,0.15,9,17,4,26.081649788824844,User0,external_65,Subnet 1 (User),External,tcp,14662,80,http,0.5,500,5,31,29,CON,0,0,1,3,Normal,Benign,28649,Data_Theft,UNSW_benign,
-3,30,0.15,9,17,4,66.96322144464682,Enterprise2,Enterprise0,Subnet 2 (Enterprise),Subnet 2 (Enterprise),tcp,48445,22,ssh_admin,10.0,200,10,31,29,FIN,3,5,1,1,Normal,Benign,18473,Data_Theft,UNSW_benign,
-4,30,0.15,9,17,4,82.50879551073578,Enterprise0,Enterprise0,Subnet 2 (Enterprise),Subnet 2 (Enterprise),tcp,25784,53,dns,0.017953,50,1,31,29,FIN,7,14,1,2,Normal,Benign,38085,Data_Theft,UNSW_benign,
-5,30,0.15,9,17,4,126.57654590558113,User3,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),tcp,34698,53,dns,2.0,50,1,31,29,FIN,2,370,1,1,Normal,Benign,38033,Data_Theft,UNSW_benign,
-6,30,0.15,9,17,4,191.82803953736513,Enterprise0,external_25,Subnet 2 (Enterprise),External,tcp,17328,80,http,0.5,500,5,31,29,CON,0,0,1,1,Normal,Benign,37817,Data_Theft,UNSW_benign,
-7,30,0.15,9,17,4,203.00984622687338,Enterprise0,external_75,Subnet 2 (Enterprise),External,tcp,35018,80,http,1.061591,500,5,254,252,FIN,27,1,2,15,Normal,Benign,46742,Data_Theft,UNSW_benign,
-8,30,0.15,9,17,4,220.94136424920373,User0,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),tcp,4756,3389,rdp,30.0,5000,50,31,29,FIN,7,30,1,1,Normal,Benign,20278,Data_Theft,UNSW_benign,
-9,30,0.15,9,17,4,267.6538703114536,User2,external_34,Subnet 1 (User),External,tcp,27071,25,smtp,1.0,1000,5,254,252,FIN,27,1,1,23,Normal,Benign,46797,Data_Theft,UNSW_benign,
-10,30,0.15,9,17,4,300.1986481295871,external_external_67,external_Enterprise1,External,External,ospf,24601,5000,-,1.115789,1890,42,254,0,INT,0,0,1,1,Exploits,Malicious,150335,Data_Theft,UNSW_actual,initial_access
-11,30,0.15,9,17,4,368.1242531653574,external_Enterprise0,external_external_181,External,External,tcp,29661,20,ftp-data,0.046396,2208,14,31,29,FIN,1,2,1,4,Normal,Malicious,19333,Data_Theft,UNSW_actual,initial_access
-12,30,0.15,9,17,4,436.7023685873558,external_Enterprise1,external_OpServer0,External,External,udp,25758,53,dns,9e-06,114,2,254,0,INT,0,0,16,26,Generic,Malicious,153891,Data_Theft,UNSW_actual,progression
-13,30,0.15,9,17,4,500.26535969683863,external_User0,external_external_155,External,External,udp,5768,5000,-,0.001723,832,8,31,29,CON,0,0,1,3,Normal,Malicious,32453,Data_Theft,UNSW_actual,progression
-14,30,0.15,9,17,4,601.9883765068665,external_User3,external_Enterprise0,External,External,tcp,41838,80,http,0.296656,1256,16,254,252,FIN,2,1,1,1,Normal,Malicious,35,Data_Theft,UNSW_actual,progression
-15,30,0.15,9,17,4,706.4988443777952,external_User0,external_external_149,External,External,arp,8648,5000,-,0.0,46,1,0,0,INT,0,0,2,2,Normal,Malicious,108811,Data_Theft,UNSW_actual,progression
-16,30,0.15,9,17,4,803.6329432040214,external_Defender,external_Defender,External,External,tcp,47490,5000,-,0.449583,1110,18,254,252,FIN,2,1,3,7,Fuzzers,Malicious,50344,Data_Theft,UNSW_actual,objective
-17,30,0.15,9,17,4,868.1362708136046,external_Defender,external_Enterprise2,External,External,unas,28335,5000,-,6e-06,200,2,254,0,INT,0,0,1,1,Exploits,Malicious,107038,Data_Theft,UNSW_actual,objective
-18,30,0.15,9,17,4,937.2617712258394,external_User0,external_external_221,External,External,tcp,47760,5000,-,0.910895,1330,24,254,252,FIN,4,3,1,2,Normal,Malicious,46303,Data_Theft,UNSW_actual,objective
-19,30,0.15,9,17,4,1005.1990077424488,Enterprise0,external_82,Subnet 2 (Enterprise),External,tcp,51263,53,dns,0.01,50,1,31,29,CON,0,0,2,2,Normal,Benign,16879,Data_Theft,UNSW_benign,
-20,30,0.15,9,17,4,1009.2745843380148,Enterprise2,external_80,Subnet 2 (Enterprise),External,tcp,13625,15164,http,0.1,200,10,64,64,CON,0,0,1,1,Normal,False Alarm,-1,unknown,synthetic_false_alarm_type1,
-21,30,0.15,9,17,4,1124.3835998494253,User2,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),udp,11333,53,dns,0.929704,50,1,254,252,FIN,5,3,1,5,Normal,Benign,41849,Data_Theft,UNSW_benign,
-22,30,0.15,9,17,4,1219.3432753666928,Enterprise2,external_30,Subnet 2 (Enterprise),External,tcp,6253,14558,smtp,0.675098,200,10,64,64,CON,0,0,1,1,Normal,False Alarm,-1,unknown,synthetic_false_alarm_type1,
-23,30,0.15,9,17,4,1269.2756360901014,Enterprise1,OpHost0,Subnet 2 (Enterprise),Subnet 3 (Operational),tcp,44937,22,ssh_admin,10.0,200,10,31,29,FIN,7,11,1,2,Normal,Benign,14280,Data_Theft,UNSW_benign,
-24,30,0.15,9,17,4,1272.2004132143934,User0,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),tcp,46434,80,http,0.5,500,5,31,29,FIN,7,7,1,2,Normal,Benign,12454,Data_Theft,UNSW_benign,
-25,30,0.15,9,17,4,1320.7452062733782,Enterprise0,external_86,Subnet 2 (Enterprise),External,tcp,43493,25,smtp,1.0,258054,516,64,64,CON,0,0,1,1,Normal,False Alarm,-1,unknown,synthetic_false_alarm_type2,
-26,30,0.15,9,17,4,1369.498873269492,User3,external_36,Subnet 1 (User),External,tcp,11683,53,dns,1.0,241550,483,64,64,CON,0,0,1,1,Normal,False Alarm,-1,unknown,synthetic_false_alarm_type2,
-27,30,0.15,9,17,4,1558.5115159905815,User3,external_6,Subnet 1 (User),External,tcp,27248,53,dns,0.017887,50,1,31,29,FIN,7,13,1,2,Normal,Benign,9980,Data_Theft,UNSW_benign,
-28,30,0.15,9,17,4,1644.6554014662463,Enterprise2,Enterprise0,Subnet 2 (Enterprise),Subnet 2 (Enterprise),udp,34003,53,dns,0.505622,50,1,31,29,FIN,7,7,1,3,Normal,Benign,29941,Data_Theft,UNSW_benign,
-29,30,0.15,9,17,4,1647.5443653422612,Enterprise0,external_96,Subnet 2 (Enterprise),External,tcp,43566,3389,rdp,30.0,5000,50,31,29,FIN,7,24,1,1,Normal,Benign,22080,Data_Theft,UNSW_benign,
-30,30,0.15,9,17,4,1765.770457765425,User1,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),tcp,18346,21,ftp,5.0,100000,50,31,29,CON,0,0,1,1,Normal,Benign,25909,Data_Theft,UNSW_benign,
+1,30,0.15,9,17,4,7.50322656680008,Enterprise2,external_7,Subnet 2 (Enterprise),External,tcp,59115,21,ftp,5.0,100000,50,31,29,FIN,5,15,3,4,Normal,Benign,1934,Data_Theft,UNSW_benign,
+2,30,0.15,9,17,4,26.081649788824844,User0,external_65,Subnet 1 (User),External,tcp,34858,80,http,1.048057,500,5,254,252,FIN,2,3,1,2,Normal,Benign,47632,Data_Theft,UNSW_benign,
+3,30,0.15,9,17,4,66.96322144464682,Enterprise2,Enterprise0,Subnet 2 (Enterprise),Subnet 2 (Enterprise),tcp,18614,22,ssh_admin,10.0,200,10,31,29,CON,0,0,2,4,Normal,Benign,32752,Data_Theft,UNSW_benign,
+4,30,0.15,9,17,4,82.50879551073578,Enterprise0,Enterprise0,Subnet 2 (Enterprise),Subnet 2 (Enterprise),tcp,49615,53,dns,0.81542,50,1,254,252,FIN,2,1,2,3,Normal,Benign,44070,Data_Theft,UNSW_benign,
+5,30,0.15,9,17,4,126.57654590558113,User3,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),tcp,51503,53,dns,0.01,50,1,254,0,INT,0,0,5,23,Normal,Benign,85804,Data_Theft,UNSW_benign,
+6,30,0.15,9,17,4,191.82803953736513,Enterprise0,external_25,Subnet 2 (Enterprise),External,tcp,13751,80,http,0.613025,500,5,31,29,FIN,4,1,1,3,Normal,Benign,19253,Data_Theft,UNSW_benign,
+7,30,0.15,9,17,4,203.00984622687338,Enterprise0,external_75,Subnet 2 (Enterprise),External,tcp,22822,80,http,0.603257,500,5,62,252,FIN,2,2,1,5,Normal,Benign,86379,Data_Theft,UNSW_benign,
+8,30,0.15,9,17,4,220.94136424920373,User0,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),tcp,33798,3389,rdp,30.0,5000,50,31,29,FIN,7,11,1,1,Normal,Benign,16543,Data_Theft,UNSW_benign,
+9,30,0.15,9,17,4,267.6538703114536,User2,external_34,Subnet 1 (User),External,tcp,4805,25,smtp,1.0,1000,5,31,29,FIN,1,4,1,3,Normal,Benign,14297,Data_Theft,UNSW_benign,
+10,30,0.15,9,17,4,300.2979721943807,external_User3,external_Enterprise0,External,External,tcp,42421,5000,-,0.018177,3184,34,31,29,FIN,4,4,6,6,Normal,Malicious,9211,Data_Theft,UNSW_actual,initial_access
+11,30,0.15,9,17,4,402.186379748036,external_User2,external_OpServer0,External,External,udp,6862,5000,-,9e-06,168,2,254,0,INT,0,0,1,1,Reconnaissance,Malicious,143054,Data_Theft,UNSW_actual,initial_access
+12,30,0.15,9,17,4,505.0535528810336,external_User3,external_Enterprise1,External,External,tcp,35367,80,http,1.602557,1106988,1104,31,29,FIN,2,370,1,1,Normal,Malicious,14300,Data_Theft,UNSW_actual,progression
+13,30,0.15,9,17,4,600.2653596968387,external_User1,external_Enterprise2,External,External,udp,18207,5000,-,1.1e-05,1726,2,254,0,INT,0,0,5,14,Fuzzers,Malicious,121147,Data_Theft,UNSW_actual,progression
+14,30,0.15,9,17,4,609.2745843380148,Enterprise2,external_80,Subnet 2 (Enterprise),External,tcp,13625,15164,http,0.1,200,10,64,64,CON,0,0,1,1,Normal,False Alarm,-1,unknown,synthetic_false_alarm_type1,
+15,30,0.15,9,17,4,701.9883765068665,external_User1,external_OpServer0,External,External,crudp,26495,5000,-,9e-06,200,2,254,0,INT,0,0,2,5,Exploits,Malicious,77533,Data_Theft,UNSW_actual,progression
+16,30,0.15,9,17,4,806.4988443777952,external_Defender,external_OpHost2,External,External,trunk-1,45303,5000,-,9e-06,200,2,254,0,INT,0,0,1,6,DoS,Malicious,151685,Data_Theft,UNSW_actual,progression
+17,30,0.15,9,17,4,905.4494148060321,external_User0,external_Enterprise0,External,External,tcp,40185,80,http,0.18805,1468,16,254,252,FIN,2,1,1,1,Reconnaissance,Malicious,73634,Data_Theft,UNSW_actual,objective
+18,30,0.15,9,17,4,1002.204406220407,external_external_175,external_OpHost1,External,External,bna,5590,5000,-,4e-06,200,2,254,0,INT,0,0,1,15,Reconnaissance,Malicious,91820,Data_Theft,UNSW_actual,objective
+19,30,0.15,9,17,4,1105.8926568387592,external_User3,external_Enterprise1,External,External,udp,32403,5000,-,0.002128,832,8,31,29,CON,0,0,1,3,Normal,Malicious,32333,Data_Theft,UNSW_actual,objective
+20,30,0.15,9,17,4,1203.8992558068367,Enterprise0,external_82,Subnet 2 (Enterprise),External,tcp,14616,53,dns,0.01,50,1,31,29,CON,0,0,1,2,Normal,Benign,3198,Data_Theft,UNSW_benign,
+21,30,0.15,9,17,4,1209.6716376833465,Enterprise2,external_30,Subnet 2 (Enterprise),External,tcp,6253,14558,smtp,0.144183,200,10,64,64,CON,0,0,1,1,Normal,False Alarm,-1,unknown,synthetic_false_alarm_type1,
+22,30,0.15,9,17,4,1293.2876998870688,User2,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),udp,5623,53,dns,0.223362,50,1,31,29,FIN,4,1,1,5,Normal,Benign,18416,Data_Theft,UNSW_benign,
+23,30,0.15,9,17,4,1401.9567270675761,Enterprise1,OpHost0,Subnet 2 (Enterprise),Subnet 3 (Operational),tcp,62975,22,ssh_admin,10.0,200,10,254,252,FIN,2,1,2,12,Normal,Benign,74179,Data_Theft,UNSW_benign,
+24,30,0.15,9,17,4,1404.1503099107952,User0,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),tcp,42138,80,http,0.5,500,5,31,29,CON,0,0,2,2,Normal,Benign,38760,Data_Theft,UNSW_benign,
+25,30,0.15,9,17,4,1460.3726031366891,Enterprise0,external_86,Subnet 2 (Enterprise),External,tcp,43493,25,smtp,1.0,258054,516,64,64,CON,0,0,1,1,Normal,False Alarm,-1,unknown,synthetic_false_alarm_type2,
+26,30,0.15,9,17,4,1484.749436634746,User3,external_36,Subnet 1 (User),External,tcp,11683,53,dns,1.0,241550,483,64,64,CON,0,0,1,1,Normal,False Alarm,-1,unknown,synthetic_false_alarm_type2,
+27,30,0.15,9,17,4,1618.883636992936,User3,external_6,Subnet 1 (User),External,tcp,63757,53,dns,0.01,50,1,0,0,INT,0,0,2,2,Normal,Benign,108648,Data_Theft,UNSW_benign,
+28,30,0.15,9,17,4,1683.4915510996848,Enterprise2,Enterprise0,Subnet 2 (Enterprise),Subnet 2 (Enterprise),udp,25827,53,dns,0.086992,50,1,31,29,FIN,7,30,1,2,Normal,Benign,24736,Data_Theft,UNSW_benign,
+29,30,0.15,9,17,4,1685.658274006696,Enterprise0,external_96,Subnet 2 (Enterprise),External,tcp,9385,3389,rdp,30.0,5000,50,31,29,FIN,7,7,1,2,Normal,Benign,9264,Data_Theft,UNSW_benign,
+30,30,0.15,9,17,4,1774.3278433240687,User1,Enterprise0,Subnet 1 (User),Subnet 2 (Enterprise),tcp,48119,21,ftp,5.0,100000,50,31,29,FIN,7,14,1,1,Normal,Benign,1101,Data_Theft,UNSW_benign,

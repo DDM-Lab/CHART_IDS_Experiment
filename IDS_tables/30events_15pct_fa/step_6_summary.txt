@@ -2,7 +2,7 @@
 STEP 6: FINAL IDS TABLE ASSEMBLY WITH PARAMETERIZED COUNTS
 ================================================================================
 
-Timestamp: 2026-04-19 11:09:47.789619
+Timestamp: 2026-04-23 16:14:38.921206
 Output Directory: IDS_tables\30events_15pct_fa
 Total Events Per Table: 30
 False Alarm Percentage: 15%
@@ -53,7 +53,7 @@ Label Distribution:
 
 Time Range:
   Min: 7.5s
-  Max: 1765.8s
+  Max: 1774.3s
 
 ================================================================================
 Scenario: ShellShock
@@ -76,7 +76,7 @@ Label Distribution:
 
 Time Range:
   Min: 7.5s
-  Max: 1770.0s
+  Max: 1774.3s
 
 ================================================================================
 Scenario: Netcat_Backdoor
@@ -99,7 +99,7 @@ Label Distribution:
 
 Time Range:
   Min: 7.5s
-  Max: 1770.0s
+  Max: 1774.3s
 
 ================================================================================
 Scenario: passwd_gzip_scp
@@ -122,7 +122,7 @@ Label Distribution:
 
 Time Range:
   Min: 7.5s
-  Max: 1770.0s
+  Max: 1774.3s
 
 ================================================================================
 Scenario: No_Attack

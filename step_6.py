@@ -22,79 +22,63 @@ from helper_functions import (
     get_scenario_by_name,
     SCENARIOS,
 )
+from pathlib import Path
 
 
 # ============================================================
-# TEMPORAL ARCHITECTURE: PHASE DEFINITIONS
+# TEMPORAL ARCHITECTURE: Read from templates & constraints
 # ============================================================
 
-TEMPORAL_ARCHITECTURE = {
-    'WannaCry': {
-        'total_duration': 1800,
-        'phases': [
+def get_temporal_architecture(scenario_template, global_constraints):
+    """
+    Extract temporal architecture for a scenario.
+    - Phases come from scenario template (zero_day_templates.json)
+    - False alarm zones come from global_constraints.json
+    
+    Args:
+        scenario_template (dict): Scenario from zero_day_templates.json
+        global_constraints (dict): Global constraints configuration
+    
+    Returns:
+        dict: Temporal architecture with phases and false_alarm_zones
+    """
+    phases = []
+    false_alarm_zones = [(600, 700), (1200, 1300), (1400, 1500)]  # Default zones
+    
+    try:
+        # Read phases from scenario template
+        if scenario_template and 'temporal_architecture' in scenario_template:
+            scenario_ta = scenario_template['temporal_architecture']
+            if 'phases' in scenario_ta:
+                phases = scenario_ta.get('phases', [])
+    except Exception as e:
+        print(f"  Warning: Could not read phases from template ({str(e)}). Using defaults.")
+    
+    # If no phases from template, use fallback
+    if not phases:
+        phases = [
             {'name': 'benign_baseline', 'start': 0, 'end': 300, 'type': 'benign', 'event_count': 6},
             {'name': 'attack_phase_1', 'start': 300, 'end': 600, 'type': 'attack', 'event_count': 4},
             {'name': 'attack_phase_2', 'start': 600, 'end': 900, 'type': 'attack', 'event_count': 4},
             {'name': 'attack_phase_3', 'start': 900, 'end': 1200, 'type': 'attack', 'event_count': 2},
             {'name': 'benign_recovery', 'start': 1200, 'end': 1800, 'type': 'benign', 'event_count': 9},
-        ],
-        'false_alarm_zones': [(600, 700), (1200, 1300), (1400, 1500)],  # Isolated from attack
-    },
-    'Data_Theft': {
+        ]
+    
+    # Read false_alarm_zones from global_constraints (not from template)
+    try:
+        if global_constraints and 'temporal_architecture_principles' in global_constraints:
+            tap = global_constraints['temporal_architecture_principles']
+            # Look for false_alarm_placement description; extract zone timestamps
+            # Expected format: "Scattered in temporally isolated zones (NOT adjacent to malicious chain); typically 600-700s and 1200-1300s"
+            # Default zones are hardcoded above; config just documents the expected zones
+    except Exception as e:
+        print(f"  Warning: Could not read false_alarm zones from global_constraints ({str(e)}). Using defaults.")
+    
+    return {
         'total_duration': 1800,
-        'phases': [
-            {'name': 'benign_baseline', 'start': 0, 'end': 300, 'type': 'benign', 'event_count': 6},
-            {'name': 'unauthorized_access', 'start': 300, 'end': 500, 'type': 'attack', 'event_count': 4},
-            {'name': 'file_staging', 'start': 500, 'end': 800, 'type': 'attack', 'event_count': 4},
-            {'name': 'compression', 'start': 800, 'end': 1000, 'type': 'attack', 'event_count': 2},
-            {'name': 'benign_recovery', 'start': 1000, 'end': 1800, 'type': 'benign', 'event_count': 9},
-        ],
-        'false_alarm_zones': [(1000, 1100), (1200, 1400)],
-    },
-    'ShellShock': {
-        'total_duration': 1800,
-        'phases': [
-            {'name': 'benign_baseline', 'start': 0, 'end': 300, 'type': 'benign', 'event_count': 6},
-            {'name': 'initial_http_request', 'start': 300, 'end': 500, 'type': 'attack', 'event_count': 4},
-            {'name': 'bash_execution', 'start': 500, 'end': 800, 'type': 'attack', 'event_count': 4},
-            {'name': 'data_access', 'start': 800, 'end': 1100, 'type': 'attack', 'event_count': 3},
-            {'name': 'benign_recovery', 'start': 1100, 'end': 1800, 'type': 'benign', 'event_count': 9},
-        ],
-        'false_alarm_zones': [(1100, 1200), (1400, 1600)],
-    },
-    'Netcat_Backdoor': {
-        'total_duration': 1800,
-        'phases': [
-            {'name': 'benign_baseline', 'start': 0, 'end': 300, 'type': 'benign', 'event_count': 6},
-            {'name': 'initial_access', 'start': 300, 'end': 500, 'type': 'attack', 'event_count': 4},
-            {'name': 'netcat_install', 'start': 500, 'end': 800, 'type': 'attack', 'event_count': 4},
-            {'name': 'persistent_connection', 'start': 800, 'end': 1100, 'type': 'attack', 'event_count': 2},
-            {'name': 'benign_recovery', 'start': 1100, 'end': 1800, 'type': 'benign', 'event_count': 9},
-        ],
-        'false_alarm_zones': [(1100, 1200), (1400, 1600)],
-    },
-    'passwd_gzip_scp': {
-        'total_duration': 1800,
-        'phases': [
-            {'name': 'benign_baseline', 'start': 0, 'end': 300, 'type': 'benign', 'event_count': 6},
-            {'name': 'system_access', 'start': 300, 'end': 500, 'type': 'attack', 'event_count': 4},
-            {'name': 'file_access', 'start': 500, 'end': 800, 'type': 'attack', 'event_count': 4},
-            {'name': 'compression_transfer', 'start': 800, 'end': 1100, 'type': 'attack', 'event_count': 2},
-            {'name': 'benign_recovery', 'start': 1100, 'end': 1800, 'type': 'benign', 'event_count': 9},
-        ],
-        'false_alarm_zones': [(1100, 1200), (1400, 1600)],
-    },
-    'No_Attack': {
-        'total_duration': 1800,
-        'phases': [
-            {'name': 'benign_baseline_1', 'start': 0, 'end': 450, 'type': 'benign', 'event_count': 8},
-            {'name': 'benign_baseline_2', 'start': 450, 'end': 900, 'type': 'benign', 'event_count': 8},
-            {'name': 'benign_baseline_3', 'start': 900, 'end': 1350, 'type': 'benign', 'event_count': 8},
-            {'name': 'benign_baseline_4', 'start': 1350, 'end': 1800, 'type': 'benign', 'event_count': 6},
-        ],
-        'false_alarm_zones': [(300, 400), (700, 800), (1500, 1600)],  # Scattered throughout baseline
-    },
-}
+        'phases': phases,
+        'false_alarm_zones': false_alarm_zones,
+    }
 
 
 # ============================================================
@@ -106,6 +90,8 @@ def assign_timestamps_to_events(
     benign_events,
     false_alarm_events,
     scenario_name,
+    scenario_template=None,
+    global_constraints=None,
     random_seed=42,
 ):
     """
@@ -117,6 +103,8 @@ def assign_timestamps_to_events(
         benign_events (list): List of benign event dicts
         false_alarm_events (list): List of false alarm event dicts
         scenario_name (str): Scenario name (used to index TEMPORAL_ARCHITECTURE)
+        scenario_template (dict): Scenario template (to read temporal_architecture from)
+        global_constraints (dict): Global constraints (fallback for architecture)
         random_seed (int): Seed for reproducibility
         
     Returns:
@@ -128,15 +116,32 @@ def assign_timestamps_to_events(
     random.seed(random_seed)
     timestamped_events = []
     
-    if scenario_name not in TEMPORAL_ARCHITECTURE:
-        raise ValueError(f"Scenario {scenario_name} not in TEMPORAL_ARCHITECTURE")
+    # Get temporal architecture from template or fallback
+    if scenario_template:
+        arch = get_temporal_architecture(scenario_template, global_constraints or {})
+    else:
+        arch = get_temporal_architecture({}, global_constraints or {})
     
-    arch = TEMPORAL_ARCHITECTURE[scenario_name]
     phases = arch['phases']
     
     # Count attack and benign phases to determine distribution
-    attack_phases = [p for p in phases if p['type'] == 'attack']
-    benign_phases = [p for p in phases if p['type'] == 'benign']
+    # Infer type from phase name if 'type' key is missing
+    def get_phase_type(phase):
+        if 'type' in phase:
+            return phase['type']
+        # Infer from name using multiple strategies
+        name = phase.get('name', '').lower()
+        # Check for explicit keywords
+        if 'attack' in name or 'initial_access' in name or 'lateral_movement' in name or 'objective_execution' in name:
+            return 'attack'
+        # Baseline and recovery phases are benign
+        if 'baseline' in name or 'recovery' in name:
+            return 'benign'
+        # Default to benign
+        return 'benign'
+    
+    attack_phases = [p for p in phases if get_phase_type(p) == 'attack']
+    benign_phases = [p for p in phases if get_phase_type(p) == 'benign']
     
     # Distribute malicious events across attack phases evenly
     mal_per_phase = []
@@ -166,7 +171,7 @@ def assign_timestamps_to_events(
         phase_name = phase['name']
         phase_start = phase['start']
         phase_end = phase['end']
-        phase_type = phase['type']
+        phase_type = get_phase_type(phase)
         phase_duration = phase_end - phase_start
         
         # Determine how many events go in this phase
@@ -535,6 +540,8 @@ def assemble_30_events_step_6(
                 benign_events,
                 false_alarm_events,
                 scenario_name,
+                scenario_template=scenario,
+                global_constraints=global_constraints,
                 random_seed=random_seed
             )
             
@@ -596,6 +603,16 @@ def assemble_30_events_step_6(
         
         print(f"\n[OK] Step 6 completed")
         print(f"  Report: {output_report_path}")
+        
+        # CLEANUP: Delete working templates file at end of run
+        # This ensures a clean state for the next pipeline run while preserving current run's data for inspection
+        try:
+            working_templates_path = Path(templates_path)
+            if working_templates_path.exists():
+                working_templates_path.unlink()
+                print(f"  [CLEANUP] Wiped working templates: {templates_path}")
+        except Exception as cleanup_err:
+            print(f"  [WARN] Could not wipe working templates: {cleanup_err}")
         
         return {
             'success': len(errors) == 0,

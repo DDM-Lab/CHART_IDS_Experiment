@@ -34,26 +34,56 @@ from helper_functions import (
 
 
 # ============================================================
-# FALSE ALARM CHARACTERISTICS
+# FALSE ALARM CHARACTERISTICS (read from global_constraints.json)
 # ============================================================
 
-FALSE_ALARM_TYPES = {
-    'type_1_unusual_port_benign_service': {
-        'count': 2,
-        'description': 'Unusual port + benign service (looks suspicious but harmless)',
-        'anomaly': 'port',  # The anomalous element
-    },
-    'type_2_high_volume_benign_service': {
-        'count': 2,
-        'description': 'High volume + benign service (large transfer but harmless)',
-        'anomaly': 'bytes',  # The anomalous element
-    },
-    'type_3_rare_duration_benign_service': {
-        'count': 1,
-        'description': 'Rare duration + benign service (long session but harmless)',
-        'anomaly': 'duration',  # The anomalous element
-    },
-}
+def get_false_alarm_types(global_constraints):
+    """
+    Get false alarm type definitions from global_constraints.json.
+    
+    Args:
+        global_constraints (dict): Global constraints configuration
+    
+    Returns:
+        dict: False alarm types with counts and descriptions
+    """
+    try:
+        if 'false_alarm_taxonomy' in global_constraints:
+            fa_taxonomy = global_constraints['false_alarm_taxonomy']
+            
+            # Convert JSON structure to usable format
+            false_alarm_types = {}
+            for fa_type_key, fa_type_info in fa_taxonomy.items():
+                if isinstance(fa_type_info, dict):
+                    false_alarm_types[fa_type_key] = {
+                        'count': fa_type_info.get('typical_features', {}).get('count', 2) if 'typical_features' in fa_type_info else (1 if 'type_3' in fa_type_key else 2),
+                        'description': fa_type_info.get('description', ''),
+                        'anomaly': fa_type_info.get('anomaly', ''),
+                    }
+            
+            if false_alarm_types:
+                return false_alarm_types
+    except Exception as e:
+        print(f"  Warning: Could not read false_alarm_taxonomy from global_constraints ({str(e)}). Using defaults.")
+    
+    # Fallback defaults (matches original hardcoded values)
+    return {
+        'type_1_unusual_port_benign_service': {
+            'count': 2,
+            'description': 'Unusual port + benign service (looks suspicious but harmless)',
+            'anomaly': 'port',
+        },
+        'type_2_high_volume_benign_service': {
+            'count': 2,
+            'description': 'High volume + benign service (large transfer but harmless)',
+            'anomaly': 'bytes',
+        },
+        'type_3_rare_duration_benign_service': {
+            'count': 1,
+            'description': 'Rare duration + benign service (long session but harmless)',
+            'anomaly': 'duration',
+        },
+    }
 
 
 # ============================================================
@@ -128,6 +158,10 @@ def generate_false_alarms_step_5(
         benign_stats = _compute_benign_stats(pooled_benign_df)
         print(f"  Benign stats computed: bytes 90th percentile={benign_stats['bytes_90th']}, duration 90th percentile={benign_stats['duration_90th']}")
         
+        # Get false alarm types from configuration
+        false_alarm_types = get_false_alarm_types(global_constraints)
+        print(f"  False alarm types loaded: {list(false_alarm_types.keys())}")
+        
         # Generate false alarms for each scenario
         for scenario_name in SCENARIOS:
             print(f"\n  Generating false alarms for {scenario_name}...")
@@ -152,7 +186,8 @@ def generate_false_alarms_step_5(
                     scenario_template,
                     global_constraints,
                     false_alarm_count=fa_count,
-                    fa_type_ratio_mode=fa_type_ratio_mode
+                    fa_type_ratio_mode=fa_type_ratio_mode,
+                    false_alarm_types=false_alarm_types
                 )
                 
                 false_alarm_events_per_scenario[scenario_name] = events
@@ -216,7 +251,7 @@ def _compute_benign_stats(benign_df):
     return stats
 
 
-def _generate_false_alarms_for_scenario(scenario_name, pooled_benign_df, benign_stats, template, constraints, false_alarm_count=5, fa_type_ratio_mode="balanced"):
+def _generate_false_alarms_for_scenario(scenario_name, pooled_benign_df, benign_stats, template, constraints, false_alarm_count=5, fa_type_ratio_mode="balanced", false_alarm_types=None):
     """
     Generate false alarm events for a single scenario.
     
@@ -236,10 +271,15 @@ def _generate_false_alarms_for_scenario(scenario_name, pooled_benign_df, benign_
         constraints (dict): Global constraints
         false_alarm_count (int): Total number of false alarm events to generate (default: 5)
         fa_type_ratio_mode (str): Distribution mode for types. Default: "balanced" (40:40:20)
+        false_alarm_types (dict): False alarm types config (from JSON). If None, uses defaults.
     
     Returns:
         list: False alarm event dictionaries (may be empty if false_alarm_count=0)
     """
+    
+    # Use provided false_alarm_types or get defaults from constraints
+    if false_alarm_types is None:
+        false_alarm_types = get_false_alarm_types(constraints)
     
     # Handle edge case: no false alarms requested
     if false_alarm_count == 0:
@@ -279,8 +319,9 @@ def _generate_false_alarms_for_scenario(scenario_name, pooled_benign_df, benign_
     events = []
     event_idx = 0
     
-    # Type 1: Unusual Port + Benign Service (2 events)
-    for i in range(FALSE_ALARM_TYPES['type_1_unusual_port_benign_service']['count']):
+    # Type 1: Unusual Port + Benign Service
+    type1_count = false_alarm_types.get('type_1_unusual_port_benign_service', {}).get('count', 2)
+    for i in range(type1_count):
         if event_idx < len(sampled_df):
             row = sampled_df.iloc[event_idx]
             event = _generate_type1_unusual_port(
@@ -289,8 +330,9 @@ def _generate_false_alarms_for_scenario(scenario_name, pooled_benign_df, benign_
             events.append(event)
             event_idx += 1
     
-    # Type 2: High Volume + Benign Service (2 events)
-    for i in range(FALSE_ALARM_TYPES['type_2_high_volume_benign_service']['count']):
+    # Type 2: High Volume + Benign Service
+    type2_count = false_alarm_types.get('type_2_high_volume_benign_service', {}).get('count', 2)
+    for i in range(type2_count):
         if event_idx < len(sampled_df):
             row = sampled_df.iloc[event_idx]
             event = _generate_type2_high_volume(
@@ -299,8 +341,9 @@ def _generate_false_alarms_for_scenario(scenario_name, pooled_benign_df, benign_
             events.append(event)
             event_idx += 1
     
-    # Type 3: Rare Duration + Benign Service (1 event)
-    for i in range(FALSE_ALARM_TYPES['type_3_rare_duration_benign_service']['count']):
+    # Type 3: Rare Duration + Benign Service
+    type3_count = false_alarm_types.get('type_3_rare_duration_benign_service', {}).get('count', 1)
+    for i in range(type3_count):
         if event_idx < len(sampled_df):
             row = sampled_df.iloc[event_idx]
             event = _generate_type3_rare_duration(
