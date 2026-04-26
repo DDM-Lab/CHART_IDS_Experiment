@@ -1247,6 +1247,25 @@ class PipelineConfig:
         print(f"{'='*70}\n")
 
 
+def get_ratio_mode_short_code(fa_type_ratio_mode):
+    """
+    Convert fa_type_ratio_mode to short code for directory naming.
+    
+    Args:
+        fa_type_ratio_mode (str): One of: balanced, port_heavy, volume_heavy, duration_heavy
+        
+    Returns:
+        str: Short code (e.g., 'bal', 'ph', 'vh', 'dh')
+    """
+    mode_codes = {
+        'balanced': 'bal',
+        'port_heavy': 'ph',
+        'volume_heavy': 'vh',
+        'duration_heavy': 'dh'
+    }
+    return mode_codes.get(fa_type_ratio_mode, 'unknown')
+
+
 def run_pipeline(config):
     """
     Execute the complete IDS pipeline with given configuration.
@@ -1374,7 +1393,8 @@ def run_pipeline(config):
         total = mal + ben + fa
         print(f"  {scenario_name}: Malicious={mal}, Benign={ben}, FalseAlarm={fa}, Total={total}")
     
-    output_dir = Path(f"IDS_tables/{config.total_events_per_table}events_{int(config.false_alarm_pct*100)}pct_fa")
+    ratio_mode_code = get_ratio_mode_short_code(config.fa_type_ratio_mode)
+    output_dir = Path(f"IDS_tables/{config.total_events_per_table}events_{int(config.false_alarm_pct*100)}pct_fa_{ratio_mode_code}")
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"\n Output directory: {output_dir}")
     

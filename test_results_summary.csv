@@ -1,0 +1,9 @@
+run,label,status,reason
+1,MIN events (18),PASS,
+2,MAX events (45),FAIL,Execution error
+3,FA = 0% (zero),PASS,
+4,FA = 40% (high),FAIL,Execution error
+5,Ratio = port_heavy,PASS,
+6,Ratio = volume_heavy,PASS,
+7,Combined: MAX + HIGH FA,FAIL,Execution error
+8,BASELINE (current),PASS,
