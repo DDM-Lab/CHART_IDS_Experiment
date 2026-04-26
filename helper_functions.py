@@ -1293,8 +1293,9 @@ def run_pipeline(config):
     # Define file paths
     source_templates_path = Path("templates/zero_day_templates.json")
     working_templates_path = Path("templates/_working_templates.json")
-    input_unsw_csv = Path("IDS_Datasets/UNSW_NB15_training-set(in).csv")
-    output_transformed_csv = Path("IDS_Datasets/UNSW_NB15_transformed.csv")
+    # UNSW transformed dataset is stored on Google Drive (too large for GitHub)
+    # Update this path if your Google Drive shortcut differs
+    output_transformed_csv = Path(r"G:\.shortcut-targets-by-id\1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i\2025GraceRoessling\2025FriendFoeCollaborationYinuo\Documentation\IDS_zero_day_generation\ground_truth_dataset\UNSW_NB15_transformed.csv")
     global_constraints_path = Path("templates/global_constraints.json")
     network_topology_path = Path("templates/network_topology_output.json")
     
@@ -1308,11 +1309,16 @@ def run_pipeline(config):
     # ============================================================
     # PRE-STEP: TRANSFORM DATA
     # ============================================================
+    # Note: With UNSW transformed dataset on Google Drive, pre-step is skipped.
+    # The dataset is pre-transformed and shared via Google Drive.
     if output_transformed_csv.exists():
-        print(f" Transformed dataset already exists: {output_transformed_csv}")
+        print(f"[OK] Using pre-transformed dataset from Google Drive: {output_transformed_csv}")
     else:
-        print(f"Running Pre-Step: transforming UNSW data...")
-        pre_step.batch_transform_unsw(str(input_unsw_csv), str(output_transformed_csv))
+        raise FileNotFoundError(
+            f"Pre-transformed UNSW dataset not found at: {output_transformed_csv}\n"
+            f"Please ensure your Google Drive is mounted and accessible at the expected location.\n"
+            f"Edit the output_transformed_csv path in helper_functions.py if your Google Drive setup differs."
+        )
     
     # ============================================================
     # STEP 0: LOAD CONFIGURATION FILES

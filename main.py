@@ -3,6 +3,12 @@ IDS Pipeline - Main Entry Point
 
 Simple, parameterized pipeline orchestrator.
 Set your configuration parameters below, then run.
+
+IMPORTANT: Dataset Setup
+  The UNSW_NB15_transformed.csv dataset is stored on Google Drive (too large for GitHub).
+  Ensure your Google Drive is mounted/accessible before running this pipeline.
+  The path is defined in helper_functions.py:
+    G:\.shortcut-targets-by-id\1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i\...\UNSW_NB15_transformed.csv
 """
 
 from helper_functions import PipelineConfig, run_pipeline

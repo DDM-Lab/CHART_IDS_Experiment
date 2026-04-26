@@ -2,7 +2,23 @@
 
 **Date**: April 18, 2026 (Updated April 26, 2026)  
 **Status**: Pre-Step through Step 6 ✅ COMPLETE  
-**Version**: Parameterized Pipeline with Network Topology Output
+**Version**: Parameterized Pipeline with Network Topology Output and Google Drive Dataset Storage
+
+---
+
+## 📂 Dataset Storage: Google Drive
+
+The UNSW-NB15 transformed dataset is stored externally on Google Drive due to size constraints:
+
+```
+G:\.shortcut-targets-by-id\1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i\2025GraceRoessling\2025FriendFoeCollaborationYinuo\Documentation\IDS_zero_day_generation\ground_truth_dataset\UNSW_NB15_transformed.csv
+```
+
+**Why**: The raw UNSW-NB15 dataset (~175k rows) and its transformed version (~876k rows) exceed practical GitHub storage limits.
+
+**Location in code**: `helper_functions.py`, `run_pipeline()` function, `output_transformed_csv` variable.
+
+**Setup requirement**: Ensure Google Drive is mounted/accessible before running the pipeline. The pre-step (UNSW transformation) is skipped since the data is pre-transformed and shared via Google Drive.
 
 ---
 
@@ -101,12 +117,13 @@ From `network_topology_output.json`:
 
 ### ✅ Pre-Step: UNSW Dataset Transformation
 
-**Implementation**: `pre_step.py` → `batch_transform_unsw()`  
-**Output**: `UNSW_NB15_transformed.csv`
+**Implementation**: `pre_step.py` → `batch_transform_unsw()` (SKIPPED - using pre-transformed data from Google Drive)  
+**Status**: Pre-transformed data loaded from Google Drive
+**Location**: `G:\.shortcut-targets-by-id\...\UNSW_NB15_transformed.csv`
 
 **Key Achievements**:
-- **Input**: 175,341 rows (raw UNSW-NB15)
-- **Output**: 876,705 rows (5 scenarios × 175,341 UNSW rows)
+- **Input**: 175,341 rows (raw UNSW-NB15) — pre-transformed on Google Drive
+- **Output**: 876,705 rows (5 scenarios × 175,341 UNSW rows) — loaded from Google Drive
 - **Schema**: 23 columns (21 output + 2 tracking)
 - **Synthetic IP Generation**: Deterministic from `row_id + attack_cat` ✅
 - **Scenario-Specific Mapping**: MD5(scenario + IP) for deterministic host assignment ✅
@@ -122,6 +139,12 @@ From `network_topology_output.json`:
 ✓ All metrics non-negative
 ✓ Scenario distribution: 175,341 rows per scenario
 ```
+
+**Dataset Management**:
+- Pre-transformation is skipped (data already transformed)
+- Pipeline expects transformed CSV to exist at Google Drive path
+- If file not found, pipeline raises clear error with path information
+- No changes to `IDS_Datasets/` folder required
 
 **No Gaps** ✅
 

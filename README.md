@@ -17,6 +17,29 @@ The generated datasets respect:
 
 **Output**: CSV files with network traffic records labeled by event type (Malicious, Benign, False Alarm), ready for IDS training/evaluation.
 
+---
+
+## ⚠️ Important: Dataset Storage on Google Drive
+
+The UNSW-NB15 transformed dataset is **too large to store in GitHub** and is hosted on Google Drive instead:
+
+```
+G:\.shortcut-targets-by-id\1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i\2025GraceRoessling\2025FriendFoeCollaborationYinuo\Documentation\IDS_zero_day_generation\ground_truth_dataset\UNSW_NB15_transformed.csv
+```
+
+### Google Drive Setup
+
+1. **Ensure Google Drive access**: The above path assumes a Google Drive shortcut is set up on your machine
+2. **Verify the path**: 
+   - Open File Explorer and navigate to `G:\` 
+   - You should see `.shortcut-targets-by-id` folder
+   - If this doesn't work, mount Google Drive or update the path in `helper_functions.py`
+
+3. **Alternative setup** (if using different folder structure):
+   - Edit `helper_functions.py`
+   - Find the line with `output_transformed_csv = Path(r"G:\...")`
+   - Replace with your actual path to `UNSW_NB15_transformed.csv`
+
 ## 📊 Quick Start
 
 ### Prerequisites
@@ -36,9 +59,17 @@ cd CHART_IDS_Experiment
 pip install pandas numpy scikit-learn
 ```
 
-3. **Verify the required datasets**:
-   - `IDS_Datasets/UNSW_NB15_training-set(in).csv` — UNSW dataset (download from [UNSW-NB15](https://www.unsw.adfa.edu.au/unsw-datasets/unsw-nb15/))
-   - Other files in `IDS_Datasets/` should already be present
+3. **Verify Google Drive setup**:
+   - Ensure Google Drive is mounted/accessible on your machine
+   - The pipeline expects the transformed UNSW dataset at:
+     ```
+     G:\.shortcut-targets-by-id\1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i\2025GraceRoessling\2025FriendFoeCollaborationYinuo\Documentation\IDS_zero_day_generation\ground_truth_dataset\UNSW_NB15_transformed.csv
+     ```
+   - If your path differs, update `output_transformed_csv` in `helper_functions.py`
+
+4. **Verify other required files**:
+   - Template files in `templates/` should already be present
+   - No other external datasets needed
 
 ### Generate a Dataset (5 minutes)
 
@@ -185,10 +216,10 @@ Total: 30 events
 CHART_IDS_Experiment/
 ├── main.py                          # Entry point: configure parameters here
 ├── helper_functions.py              # Utilities (network topology, validation)
-├── pre_step.py                      # UNSW transformation
+├── pre_step.py                      # UNSW transformation (reference, not executed)
 ├── step_1.py through step_6.py       # Pipeline stages
-├── IDS_Datasets/
-│   └── UNSW_NB15_training-set(in).csv   # Input: raw UNSW data
+├── IDS_Datasets/                    # Folder (empty — data sourced from Google Drive)
+│   └── [Data stored on Google Drive, not in repo]
 ├── templates/
 │   ├── global_constraints.json           # Experiment rules
 │   ├── zero_day_templates.json           # Scenario definitions
@@ -271,8 +302,11 @@ print(df.groupby('label').size() / len(df))
 
 ## 🐛 Troubleshooting
 
-**Issue**: "No such file or directory: UNSW_NB15_training-set(in).csv"
-- **Solution**: Download UNSW-NB15 from [UNSW](https://www.unsw.adfa.edu.au/unsw-datasets/unsw-nb15/) and place in `IDS_Datasets/`
+**Issue**: "Pre-transformed UNSW dataset not found at: G:\..."
+- **Solution**: Verify Google Drive is mounted and accessible. Check that the path in `helper_functions.py` matches your Google Drive setup. You may need to mount Google Drive differently depending on your system.
+
+**Issue**: "No such file or directory: UNSW_NB15_transformed.csv"
+- **Solution**: This is a Google Drive path issue. Ensure the dataset file exists at the location specified in `helper_functions.py`.
 
 **Issue**: "Invalid false_alarm_bin" error
 - **Solution**: Check spelling in main.py — must be one of: zero, very_conservative, conservative, standard, elevated, high
