@@ -1,0 +1,122 @@
+{
+  "vpc_id": {
+    "value": "vpc-0a1b2c3d4e5f6g7h8",
+    "description": "VPC ID for the IDS experiment network"
+  },
+  "vpc_cidr": {
+    "value": "10.0.0.0/16",
+    "description": "VPC CIDR block"
+  },
+  "igw_id": {
+    "value": "igw-0x1y2z3a4b5c6d7e8",
+    "description": "Internet Gateway ID for User subnet outbound access"
+  },
+  "user_subnet_id": {
+    "value": "subnet-0m1n2o3p4q5r6s7t8",
+    "description": "User Workstations Subnet ID (10.0.1.0/24)"
+  },
+  "user_subnet_cidr": {
+    "value": "10.0.1.0/24",
+    "description": "User Workstations Subnet CIDR"
+  },
+  "enterprise_subnet_id": {
+    "value": "subnet-0u1v2w3x4y5z6a7b8",
+    "description": "Enterprise Services Subnet ID (10.0.2.0/24)"
+  },
+  "enterprise_subnet_cidr": {
+    "value": "10.0.2.0/24",
+    "description": "Enterprise Services Subnet CIDR"
+  },
+  "operational_subnet_id": {
+    "value": "subnet-0c1d2e3f4g5h6i7j8",
+    "description": "Operational Technology Subnet ID (10.0.3.0/24)"
+  },
+  "operational_subnet_cidr": {
+    "value": "10.0.3.0/24",
+    "description": "Operational Technology Subnet CIDR"
+  },
+  "user_instances": {
+    "value": {
+      "User0": "i-0a1b2c3d4e5f6g7h8",
+      "User1": "i-0i1j2k3l4m5n6o7p8",
+      "User2": "i-0q1r2s3t4u5v6w7x8",
+      "User3": "i-0y1z2a3b4c5d6e7f8",
+      "User4": "i-0g1h2i3j4k5l6m7n8"
+    },
+    "description": "User workstation instance IDs"
+  },
+  "user_private_ips": {
+    "value": {
+      "User0": "10.0.1.10",
+      "User1": "10.0.1.11",
+      "User2": "10.0.1.12",
+      "User3": "10.0.1.13",
+      "User4": "10.0.1.14"
+    },
+    "description": "User workstation private IPs"
+  },
+  "enterprise_instances": {
+    "value": {
+      "Enterprise0": "i-0p1q2r3s4t5u6v7w8",
+      "Enterprise1": "i-0x1y2z3a4b5c6d7e8",
+      "Enterprise2": "i-0f1g2h3i4j5k6l7m8",
+      "Defender": "i-0n1o2p3q4r5s6t7u8"
+    },
+    "description": "Enterprise services instance IDs"
+  },
+  "enterprise_private_ips": {
+    "value": {
+      "Enterprise0": "10.0.2.10",
+      "Enterprise1": "10.0.2.11",
+      "Enterprise2": "10.0.2.12",
+      "Defender": "10.0.2.20"
+    },
+    "description": "Enterprise services private IPs"
+  },
+  "operational_instances": {
+    "value": {
+      "OpHost0": "i-0v1w2x3y4z5a6b7c8",
+      "OpHost1": "i-0d1e2f3g4h5i6j7k8",
+      "OpHost2": "i-0l1m2n3o4p5q6r7s8",
+      "OpServer0": "i-0t1u2v3w4x5y6z7a8"
+    },
+    "description": "Operational technology instance IDs"
+  },
+  "operational_private_ips": {
+    "value": {
+      "OpHost0": "10.0.3.10",
+      "OpHost1": "10.0.3.11",
+      "OpHost2": "10.0.3.12",
+      "OpServer0": "10.0.3.20"
+    },
+    "description": "Operational technology private IPs"
+  },
+  "user1_gateway_info": {
+    "value": {
+      "instance_id": "i-0i1j2k3l4m5n6o7p8",
+      "private_ip": "10.0.1.11",
+      "role": "attack-entry-gateway",
+      "description": "User1 is the designated entry point for cross-subnet attacks"
+    },
+    "description": "User1 gateway host information"
+  },
+  "defender_info": {
+    "value": {
+      "instance_id": "i-0n1o2p3q4r5s6t7u8",
+      "private_ip": "10.0.2.20",
+      "role": "ids-ips-monitor",
+      "vpc_visibility": "all-subnets",
+      "description": "Defender IDS/IPS system with visibility across all three subnets"
+    },
+    "description": "Defender (IDS/IPS) system information"
+  },
+  "routing_paths": {
+    "value": {
+      "attack_path": "User1 (10.0.1.11) → Enterprise1 (10.0.2.11) → Enterprise2 (10.0.2.12) → OpServer0 (10.0.3.20)",
+      "intra_subnet_connectivity": "All hosts within same subnet can communicate freely",
+      "cross_subnet_restrictions": "Only User1→Enterprise1, Enterprise1↔Enterprise2, Enterprise2→OpServer0 are allowed",
+      "internet_access": "All User workstations have outbound internet access via IGW"
+    },
+    "description": "Network routing paths and restrictions"
+  }
+}

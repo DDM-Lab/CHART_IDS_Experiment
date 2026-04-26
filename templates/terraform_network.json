@@ -1,0 +1,817 @@
+{
+  "terraform": {
+    "required_version": ">= 1.0",
+    "required_providers": {
+      "aws": {
+        "source": "hashicorp/aws",
+        "version": "~> 5.0"
+      }
+    }
+  },
+
+  "provider": {
+    "aws": {
+      "region": "us-east-1"
+    }
+  },
+
+  "data": {
+    "aws_ami": {
+      "amazon_linux_2": {
+        "most_recent": true,
+        "owners": ["amazon"],
+        "filter": [
+          {
+            "name": "name",
+            "values": ["amzn2-ami-hvm-*-x86_64-gp2"]
+          },
+          {
+            "name": "virtualization-type",
+            "values": ["hvm"]
+          }
+        ]
+      }
+    }
+  },
+
+  "variable": {
+    "aws_region": {
+      "type": "string",
+      "default": "us-east-1",
+      "description": "AWS region for deployment"
+    },
+    "instance_type": {
+      "type": "string",
+      "default": "t2.micro",
+      "description": "EC2 instance type for all hosts"
+    },
+    "vpc_cidr": {
+      "type": "string",
+      "default": "10.0.0.0/16",
+      "description": "VPC CIDR block"
+    },
+    "environment": {
+      "type": "string",
+      "default": "ids-experiment",
+      "description": "Environment name for tagging"
+    }
+  },
+
+  "locals": {
+    "subnet_cidrs": {
+      "user": "10.0.1.0/24",
+      "enterprise": "10.0.2.0/24",
+      "operational": "10.0.3.0/24"
+    },
+    "hosts_config": {
+      "user": {
+        "User0": { "ip": "10.0.1.10", "role": "user-workstation" },
+        "User1": { "ip": "10.0.1.11", "role": "user-workstation-gateway" },
+        "User2": { "ip": "10.0.1.12", "role": "user-workstation" },
+        "User3": { "ip": "10.0.1.13", "role": "user-workstation" },
+        "User4": { "ip": "10.0.1.14", "role": "user-workstation" }
+      },
+      "enterprise": {
+        "Enterprise0": { "ip": "10.0.2.10", "role": "enterprise-server" },
+        "Enterprise1": { "ip": "10.0.2.11", "role": "enterprise-gateway" },
+        "Enterprise2": { "ip": "10.0.2.12", "role": "enterprise-gateway" },
+        "Defender": { "ip": "10.0.2.20", "role": "ids-ips-monitor" }
+      },
+      "operational": {
+        "OpHost0": { "ip": "10.0.3.10", "role": "operational-server" },
+        "OpHost1": { "ip": "10.0.3.11", "role": "operational-server" },
+        "OpHost2": { "ip": "10.0.3.12", "role": "operational-server" },
+        "OpServer0": { "ip": "10.0.3.20", "role": "operational-server-critical" }
+      }
+    }
+  },
+
+  "resource": {
+    "aws_vpc": {
+      "main": {
+        "cidr_block": "${var.vpc_cidr}",
+        "enable_dns_hostnames": true,
+        "enable_dns_support": true,
+        "tags": {
+          "Name": "ids-experiment-vpc",
+          "Environment": "${var.environment}"
+        }
+      }
+    },
+
+    "aws_subnet": {
+      "subnet_user": {
+        "vpc_id": "${aws_vpc.main.id}",
+        "cidr_block": "${local.subnet_cidrs.user}",
+        "availability_zone": "us-east-1a",
+        "tags": {
+          "Name": "user-workstations-subnet",
+          "Tier": "user",
+          "Environment": "${var.environment}"
+        }
+      },
+      "subnet_enterprise": {
+        "vpc_id": "${aws_vpc.main.id}",
+        "cidr_block": "${local.subnet_cidrs.enterprise}",
+        "availability_zone": "us-east-1a",
+        "tags": {
+          "Name": "enterprise-services-subnet",
+          "Tier": "enterprise",
+          "Environment": "${var.environment}"
+        }
+      },
+      "subnet_operational": {
+        "vpc_id": "${aws_vpc.main.id}",
+        "cidr_block": "${local.subnet_cidrs.operational}",
+        "availability_zone": "us-east-1a",
+        "tags": {
+          "Name": "operational-technology-subnet",
+          "Tier": "operational",
+          "Environment": "${var.environment}"
+        }
+      }
+    },
+
+    "aws_internet_gateway": {
+      "main": {
+        "vpc_id": "${aws_vpc.main.id}",
+        "tags": {
+          "Name": "ids-experiment-igw",
+          "Environment": "${var.environment}"
+        }
+      }
+    },
+
+    "aws_route_table": {
+      "user_subnet_public": {
+        "vpc_id": "${aws_vpc.main.id}",
+        "route": [
+          {
+            "cidr_block": "0.0.0.0/0",
+            "gateway_id": "${aws_internet_gateway.main.id}"
+          }
+        ],
+        "tags": {
+          "Name": "user-subnet-public-rt",
+          "Environment": "${var.environment}"
+        }
+      },
+      "enterprise_subnet": {
+        "vpc_id": "${aws_vpc.main.id}",
+        "route": [
+          {
+            "cidr_block": "10.0.0.0/16",
+            "gateway_id": "local"
+          }
+        ],
+        "tags": {
+          "Name": "enterprise-subnet-rt",
+          "Environment": "${var.environment}"
+        }
+      },
+      "operational_subnet": {
+        "vpc_id": "${aws_vpc.main.id}",
+        "route": [
+          {
+            "cidr_block": "10.0.0.0/16",
+            "gateway_id": "local"
+          }
+        ],
+        "tags": {
+          "Name": "operational-subnet-rt",
+          "Environment": "${var.environment}"
+        }
+      }
+    },
+
+    "aws_route_table_association": {
+      "user_subnet_public": {
+        "subnet_id": "${aws_subnet.subnet_user.id}",
+        "route_table_id": "${aws_route_table.user_subnet_public.id}"
+      },
+      "enterprise_subnet": {
+        "subnet_id": "${aws_subnet.subnet_enterprise.id}",
+        "route_table_id": "${aws_route_table.enterprise_subnet.id}"
+      },
+      "operational_subnet": {
+        "subnet_id": "${aws_subnet.subnet_operational.id}",
+        "route_table_id": "${aws_route_table.operational_subnet.id}"
+      }
+    },
+
+    "aws_security_group": {
+      "sg_user_subnet": {
+        "name": "sg-user-subnet",
+        "description": "Security group for User Workstation subnet - allows intra-subnet and outbound internet",
+        "vpc_id": "${aws_vpc.main.id}",
+        "ingress": [
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "tcp",
+            "cidr_blocks": ["10.0.1.0/24"],
+            "description": "Allow all TCP within User subnet"
+          },
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "udp",
+            "cidr_blocks": ["10.0.1.0/24"],
+            "description": "Allow all UDP within User subnet"
+          }
+        ],
+        "egress": [
+          {
+            "from_port": 0,
+            "to_port": 0,
+            "protocol": "-1",
+            "cidr_blocks": ["0.0.0.0/0"],
+            "description": "Allow all outbound traffic (internet + internal)"
+          }
+        ],
+        "tags": {
+          "Name": "sg-user-subnet",
+          "Environment": "${var.environment}"
+        }
+      },
+
+      "sg_enterprise_subnet": {
+        "name": "sg-enterprise-subnet",
+        "description": "Security group for Enterprise Services subnet - allows intra-subnet and gateway communications",
+        "vpc_id": "${aws_vpc.main.id}",
+        "ingress": [
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "tcp",
+            "cidr_blocks": ["10.0.2.0/24"],
+            "description": "Allow all TCP within Enterprise subnet"
+          },
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "udp",
+            "cidr_blocks": ["10.0.2.0/24"],
+            "description": "Allow all UDP within Enterprise subnet"
+          },
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "tcp",
+            "cidr_blocks": ["10.0.1.11/32"],
+            "description": "Allow traffic from User1 gateway (10.0.1.11)"
+          }
+        ],
+        "egress": [
+          {
+            "from_port": 0,
+            "to_port": 0,
+            "protocol": "-1",
+            "cidr_blocks": ["0.0.0.0/0"],
+            "description": "Allow all outbound traffic"
+          }
+        ],
+        "tags": {
+          "Name": "sg-enterprise-subnet",
+          "Environment": "${var.environment}"
+        }
+      },
+
+      "sg_operational_subnet": {
+        "name": "sg-operational-subnet",
+        "description": "Security group for Operational Technology subnet - allows intra-subnet and gateway communications",
+        "vpc_id": "${aws_vpc.main.id}",
+        "ingress": [
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "tcp",
+            "cidr_blocks": ["10.0.3.0/24"],
+            "description": "Allow all TCP within Operational subnet"
+          },
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "udp",
+            "cidr_blocks": ["10.0.3.0/24"],
+            "description": "Allow all UDP within Operational subnet"
+          },
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "tcp",
+            "cidr_blocks": ["10.0.2.12/32"],
+            "description": "Allow traffic from Enterprise2 gateway (10.0.2.12)"
+          }
+        ],
+        "egress": [
+          {
+            "from_port": 0,
+            "to_port": 0,
+            "protocol": "-1",
+            "cidr_blocks": ["0.0.0.0/0"],
+            "description": "Allow all outbound traffic"
+          }
+        ],
+        "tags": {
+          "Name": "sg-operational-subnet",
+          "Environment": "${var.environment}"
+        }
+      },
+
+      "sg_defender": {
+        "name": "sg-defender-ids-ips",
+        "description": "Security group for Defender (IDS/IPS) - allows monitoring traffic from all subnets",
+        "vpc_id": "${aws_vpc.main.id}",
+        "ingress": [
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "tcp",
+            "cidr_blocks": ["10.0.0.0/16"],
+            "description": "Allow all TCP from entire VPC (monitoring)"
+          },
+          {
+            "from_port": 0,
+            "to_port": 65535,
+            "protocol": "udp",
+            "cidr_blocks": ["10.0.0.0/16"],
+            "description": "Allow all UDP from entire VPC (monitoring)"
+          }
+        ],
+        "egress": [
+          {
+            "from_port": 0,
+            "to_port": 0,
+            "protocol": "-1",
+            "cidr_blocks": ["0.0.0.0/0"],
+            "description": "Allow all outbound traffic"
+          }
+        ],
+        "tags": {
+          "Name": "sg-defender-ids-ips",
+          "Environment": "${var.environment}"
+        }
+      }
+    },
+
+    "aws_network_interface": {
+      "user0_eni": {
+        "subnet_id": "${aws_subnet.subnet_user.id}",
+        "private_ips": ["10.0.1.10"],
+        "security_groups": ["${aws_security_group.sg_user_subnet.id}"],
+        "tags": {
+          "Name": "user0-eni",
+          "Hostname": "User0"
+        }
+      },
+      "user1_eni": {
+        "subnet_id": "${aws_subnet.subnet_user.id}",
+        "private_ips": ["10.0.1.11"],
+        "security_groups": ["${aws_security_group.sg_user_subnet.id}"],
+        "tags": {
+          "Name": "user1-eni",
+          "Hostname": "User1"
+        }
+      },
+      "user2_eni": {
+        "subnet_id": "${aws_subnet.subnet_user.id}",
+        "private_ips": ["10.0.1.12"],
+        "security_groups": ["${aws_security_group.sg_user_subnet.id}"],
+        "tags": {
+          "Name": "user2-eni",
+          "Hostname": "User2"
+        }
+      },
+      "user3_eni": {
+        "subnet_id": "${aws_subnet.subnet_user.id}",
+        "private_ips": ["10.0.1.13"],
+        "security_groups": ["${aws_security_group.sg_user_subnet.id}"],
+        "tags": {
+          "Name": "user3-eni",
+          "Hostname": "User3"
+        }
+      },
+      "user4_eni": {
+        "subnet_id": "${aws_subnet.subnet_user.id}",
+        "private_ips": ["10.0.1.14"],
+        "security_groups": ["${aws_security_group.sg_user_subnet.id}"],
+        "tags": {
+          "Name": "user4-eni",
+          "Hostname": "User4"
+        }
+      },
+      "enterprise0_eni": {
+        "subnet_id": "${aws_subnet.subnet_enterprise.id}",
+        "private_ips": ["10.0.2.10"],
+        "security_groups": ["${aws_security_group.sg_enterprise_subnet.id}"],
+        "tags": {
+          "Name": "enterprise0-eni",
+          "Hostname": "Enterprise0"
+        }
+      },
+      "enterprise1_eni": {
+        "subnet_id": "${aws_subnet.subnet_enterprise.id}",
+        "private_ips": ["10.0.2.11"],
+        "security_groups": ["${aws_security_group.sg_enterprise_subnet.id}"],
+        "tags": {
+          "Name": "enterprise1-eni",
+          "Hostname": "Enterprise1"
+        }
+      },
+      "enterprise2_eni": {
+        "subnet_id": "${aws_subnet.subnet_enterprise.id}",
+        "private_ips": ["10.0.2.12"],
+        "security_groups": ["${aws_security_group.sg_enterprise_subnet.id}"],
+        "tags": {
+          "Name": "enterprise2-eni",
+          "Hostname": "Enterprise2"
+        }
+      },
+      "defender_eni": {
+        "subnet_id": "${aws_subnet.subnet_enterprise.id}",
+        "private_ips": ["10.0.2.20"],
+        "security_groups": ["${aws_security_group.sg_defender.id}"],
+        "tags": {
+          "Name": "defender-eni",
+          "Hostname": "Defender"
+        }
+      },
+      "ophost0_eni": {
+        "subnet_id": "${aws_subnet.subnet_operational.id}",
+        "private_ips": ["10.0.3.10"],
+        "security_groups": ["${aws_security_group.sg_operational_subnet.id}"],
+        "tags": {
+          "Name": "ophost0-eni",
+          "Hostname": "OpHost0"
+        }
+      },
+      "ophost1_eni": {
+        "subnet_id": "${aws_subnet.subnet_operational.id}",
+        "private_ips": ["10.0.3.11"],
+        "security_groups": ["${aws_security_group.sg_operational_subnet.id}"],
+        "tags": {
+          "Name": "ophost1-eni",
+          "Hostname": "OpHost1"
+        }
+      },
+      "ophost2_eni": {
+        "subnet_id": "${aws_subnet.subnet_operational.id}",
+        "private_ips": ["10.0.3.12"],
+        "security_groups": ["${aws_security_group.sg_operational_subnet.id}"],
+        "tags": {
+          "Name": "ophost2-eni",
+          "Hostname": "OpHost2"
+        }
+      },
+      "opserver0_eni": {
+        "subnet_id": "${aws_subnet.subnet_operational.id}",
+        "private_ips": ["10.0.3.20"],
+        "security_groups": ["${aws_security_group.sg_operational_subnet.id}"],
+        "tags": {
+          "Name": "opserver0-eni",
+          "Hostname": "OpServer0"
+        }
+      }
+    },
+
+    "aws_instance": {
+      "user0": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.user0_eni.id}",
+          "device_index": 0
+        },
+        "associate_public_ip_address": true,
+        "monitoring": true,
+        "tags": {
+          "Name": "User0",
+          "Hostname": "User0",
+          "Role": "user-workstation",
+          "Subnet": "user",
+          "Environment": "${var.environment}"
+        }
+      },
+      "user1": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.user1_eni.id}",
+          "device_index": 0
+        },
+        "associate_public_ip_address": true,
+        "monitoring": true,
+        "tags": {
+          "Name": "User1",
+          "Hostname": "User1",
+          "Role": "user-workstation-gateway",
+          "Subnet": "user",
+          "Environment": "${var.environment}"
+        }
+      },
+      "user2": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.user2_eni.id}",
+          "device_index": 0
+        },
+        "associate_public_ip_address": true,
+        "monitoring": true,
+        "tags": {
+          "Name": "User2",
+          "Hostname": "User2",
+          "Role": "user-workstation",
+          "Subnet": "user",
+          "Environment": "${var.environment}"
+        }
+      },
+      "user3": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.user3_eni.id}",
+          "device_index": 0
+        },
+        "associate_public_ip_address": true,
+        "monitoring": true,
+        "tags": {
+          "Name": "User3",
+          "Hostname": "User3",
+          "Role": "user-workstation",
+          "Subnet": "user",
+          "Environment": "${var.environment}"
+        }
+      },
+      "user4": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.user4_eni.id}",
+          "device_index": 0
+        },
+        "associate_public_ip_address": true,
+        "monitoring": true,
+        "tags": {
+          "Name": "User4",
+          "Hostname": "User4",
+          "Role": "user-workstation",
+          "Subnet": "user",
+          "Environment": "${var.environment}"
+        }
+      },
+      "enterprise0": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.enterprise0_eni.id}",
+          "device_index": 0
+        },
+        "monitoring": true,
+        "tags": {
+          "Name": "Enterprise0",
+          "Hostname": "Enterprise0",
+          "Role": "enterprise-server",
+          "Subnet": "enterprise",
+          "Environment": "${var.environment}"
+        }
+      },
+      "enterprise1": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.enterprise1_eni.id}",
+          "device_index": 0
+        },
+        "monitoring": true,
+        "tags": {
+          "Name": "Enterprise1",
+          "Hostname": "Enterprise1",
+          "Role": "enterprise-gateway",
+          "Subnet": "enterprise",
+          "Environment": "${var.environment}"
+        }
+      },
+      "enterprise2": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.enterprise2_eni.id}",
+          "device_index": 0
+        },
+        "monitoring": true,
+        "tags": {
+          "Name": "Enterprise2",
+          "Hostname": "Enterprise2",
+          "Role": "enterprise-gateway",
+          "Subnet": "enterprise",
+          "Environment": "${var.environment}"
+        }
+      },
+      "defender": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.defender_eni.id}",
+          "device_index": 0
+        },
+        "monitoring": true,
+        "tags": {
+          "Name": "Defender",
+          "Hostname": "Defender",
+          "Role": "ids-ips-monitor",
+          "Subnet": "enterprise",
+          "Environment": "${var.environment}"
+        }
+      },
+      "ophost0": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.ophost0_eni.id}",
+          "device_index": 0
+        },
+        "monitoring": true,
+        "tags": {
+          "Name": "OpHost0",
+          "Hostname": "OpHost0",
+          "Role": "operational-server",
+          "Subnet": "operational",
+          "Environment": "${var.environment}"
+        }
+      },
+      "ophost1": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.ophost1_eni.id}",
+          "device_index": 0
+        },
+        "monitoring": true,
+        "tags": {
+          "Name": "OpHost1",
+          "Hostname": "OpHost1",
+          "Role": "operational-server",
+          "Subnet": "operational",
+          "Environment": "${var.environment}"
+        }
+      },
+      "ophost2": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.ophost2_eni.id}",
+          "device_index": 0
+        },
+        "monitoring": true,
+        "tags": {
+          "Name": "OpHost2",
+          "Hostname": "OpHost2",
+          "Role": "operational-server",
+          "Subnet": "operational",
+          "Environment": "${var.environment}"
+        }
+      },
+      "opserver0": {
+        "ami": "${data.aws_ami.amazon_linux_2.id}",
+        "instance_type": "${var.instance_type}",
+        "network_interface": {
+          "network_interface_id": "${aws_network_interface.opserver0_eni.id}",
+          "device_index": 0
+        },
+        "monitoring": true,
+        "tags": {
+          "Name": "OpServer0",
+          "Hostname": "OpServer0",
+          "Role": "operational-server-critical",
+          "Subnet": "operational",
+          "Environment": "${var.environment}"
+        }
+      }
+    }
+  },
+
+  "output": {
+    "vpc_id": {
+      "value": "${aws_vpc.main.id}",
+      "description": "VPC ID for the IDS experiment network"
+    },
+    "vpc_cidr": {
+      "value": "${aws_vpc.main.cidr_block}",
+      "description": "VPC CIDR block"
+    },
+    "igw_id": {
+      "value": "${aws_internet_gateway.main.id}",
+      "description": "Internet Gateway ID for User subnet outbound access"
+    },
+    "user_subnet_id": {
+      "value": "${aws_subnet.subnet_user.id}",
+      "description": "User Workstations Subnet ID (10.0.1.0/24)"
+    },
+    "user_subnet_cidr": {
+      "value": "${aws_subnet.subnet_user.cidr_block}",
+      "description": "User Workstations Subnet CIDR"
+    },
+    "enterprise_subnet_id": {
+      "value": "${aws_subnet.subnet_enterprise.id}",
+      "description": "Enterprise Services Subnet ID (10.0.2.0/24)"
+    },
+    "enterprise_subnet_cidr": {
+      "value": "${aws_subnet.subnet_enterprise.cidr_block}",
+      "description": "Enterprise Services Subnet CIDR"
+    },
+    "operational_subnet_id": {
+      "value": "${aws_subnet.subnet_operational.id}",
+      "description": "Operational Technology Subnet ID (10.0.3.0/24)"
+    },
+    "operational_subnet_cidr": {
+      "value": "${aws_subnet.subnet_operational.cidr_block}",
+      "description": "Operational Technology Subnet CIDR"
+    },
+    "user_instances": {
+      "value": {
+        "User0": "${aws_instance.user0.id}",
+        "User1": "${aws_instance.user1.id}",
+        "User2": "${aws_instance.user2.id}",
+        "User3": "${aws_instance.user3.id}",
+        "User4": "${aws_instance.user4.id}"
+      },
+      "description": "User workstation instance IDs"
+    },
+    "user_private_ips": {
+      "value": {
+        "User0": "${aws_network_interface.user0_eni.private_ip}",
+        "User1": "${aws_network_interface.user1_eni.private_ip}",
+        "User2": "${aws_network_interface.user2_eni.private_ip}",
+        "User3": "${aws_network_interface.user3_eni.private_ip}",
+        "User4": "${aws_network_interface.user4_eni.private_ip}"
+      },
+      "description": "User workstation private IPs"
+    },
+    "enterprise_instances": {
+      "value": {
+        "Enterprise0": "${aws_instance.enterprise0.id}",
+        "Enterprise1": "${aws_instance.enterprise1.id}",
+        "Enterprise2": "${aws_instance.enterprise2.id}",
+        "Defender": "${aws_instance.defender.id}"
+      },
+      "description": "Enterprise services instance IDs"
+    },
+    "enterprise_private_ips": {
+      "value": {
+        "Enterprise0": "${aws_network_interface.enterprise0_eni.private_ip}",
+        "Enterprise1": "${aws_network_interface.enterprise1_eni.private_ip}",
+        "Enterprise2": "${aws_network_interface.enterprise2_eni.private_ip}",
+        "Defender": "${aws_network_interface.defender_eni.private_ip}"
+      },
+      "description": "Enterprise services private IPs"
+    },
+    "operational_instances": {
+      "value": {
+        "OpHost0": "${aws_instance.ophost0.id}",
+        "OpHost1": "${aws_instance.ophost1.id}",
+        "OpHost2": "${aws_instance.ophost2.id}",
+        "OpServer0": "${aws_instance.opserver0.id}"
+      },
+      "description": "Operational technology instance IDs"
+    },
+    "operational_private_ips": {
+      "value": {
+        "OpHost0": "${aws_network_interface.ophost0_eni.private_ip}",
+        "OpHost1": "${aws_network_interface.ophost1_eni.private_ip}",
+        "OpHost2": "${aws_network_interface.ophost2_eni.private_ip}",
+        "OpServer0": "${aws_network_interface.opserver0_eni.private_ip}"
+      },
+      "description": "Operational technology private IPs"
+    },
+    "user1_gateway_info": {
+      "value": {
+        "instance_id": "${aws_instance.user1.id}",
+        "private_ip": "${aws_network_interface.user1_eni.private_ip}",
+        "role": "attack-entry-gateway",
+        "description": "User1 is the designated entry point for cross-subnet attacks"
+      },
+      "description": "User1 gateway host information"
+    },
+    "defender_info": {
+      "value": {
+        "instance_id": "${aws_instance.defender.id}",
+        "private_ip": "${aws_network_interface.defender_eni.private_ip}",
+        "role": "ids-ips-monitor",
+        "vpc_visibility": "all-subnets",
+        "description": "Defender IDS/IPS system with visibility across all three subnets"
+      },
+      "description": "Defender (IDS/IPS) system information"
+    },
+    "routing_paths": {
+      "value": {
+        "attack_path": "User1 (10.0.1.11) → Enterprise1 (10.0.2.11) → Enterprise2 (10.0.2.12) → OpServer0 (10.0.3.20)",
+        "intra_subnet_connectivity": "All hosts within same subnet can communicate freely",
+        "cross_subnet_restrictions": "Only User1→Enterprise1, Enterprise1↔Enterprise2, Enterprise2→OpServer0 are allowed",
+        "internet_access": "All User workstations have outbound internet access via IGW"
+      },
+      "description": "Network routing paths and restrictions"
+    }
+  }
+}
