@@ -1215,21 +1215,6 @@ Create a new test suite `test_config_driven_pipeline.py`:
 | Metadata defaults | LOW | Simple constant values; easy to verify in output CSV |
 | Integration | LOW | Run existing test suite; compare outputs byte-for-byte with seed validation |
 
-### Effort Estimate
-
-| Task | Time | Difficulty |
-|------|------|-----------|
-| Expand global_constraints.json | 30 min | Easy |
-| Create helper loader functions | 45 min | Easy-Medium |
-| Update step_2.py (temporal) | 45 min | Medium |
-| Update step_4.py (services) | 1 hour | Medium |
-| Update step_5.py (false alarms) | 1.5 hours | Medium-Hard |
-| Metadata defaults propagation | 45 min | Easy |
-| Update main.py parameter passing | 30 min | Easy |
-| Create test suite | 1.5 hours | Medium |
-| Integration testing & fixes | 1 hour | Medium |
-| **TOTAL** | **~7 hours** | **Medium** |
-
 **Recommended Approach**: Implement in this order to minimize risk:
 1. Start with metadata_defaults (lowest risk)
 2. Add temporal_architecture (one function, isolated)
