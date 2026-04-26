@@ -259,43 +259,6 @@ Each scenario requires:
 
 ---
 
-## 🔍 ONE ISSUE IDENTIFIED
-
-### Field Name Mismatch in False Alarm Distribution
-
-**Location**: Templates vs. Validation Logic
-
-**Current State in Templates**:
-```json
-"false_alarm_distribution": {
-  "type_1_unusual_benign": 2,
-  "type_2_high_volume_benign": 3
-}
-```
-
-**Expected by Validation** (`helper_functions.py`):
-```python
-required_fad = [
-  'type_1_unusual_port_benign_service',
-  'type_2_high_volume_low_risk',
-  'type_3_rare_duration_benign'
-]
-```
-
-**Discrepancies**:
-1. Field names don't match exactly (but validation currently passes—using short names)
-2. **Missing field**: `type_3_rare_duration_benign`
-3. Templates only define 2 types; constraints define 3 types
-
-**Impact**: 
-- ⚠️ Inconsistent naming could cause confusion in Steps 5-6
-- Step 5 false alarm generation may not match all 3 taxonomy types
-- Validation passes currently but should strengthen
-
-**Recommendation**: Update templates to use explicit 3-type taxonomy from `global_constraints.json`
-
----
-
 ## ✅ Helper Functions Coverage
 
 All utilities in place:
@@ -632,25 +595,6 @@ Each scenario uses a 1800-second observation window divided into phases:
 - `assemble_30_events_step_6()`: Main orchestrator
 
 **No Gaps** ✅
-
----
-
-### 🔧 Bug Fixes Applied
-
-**Issue 1: Missing Columns in Steps 3-5** (FIXED ✅)
-- **Problem**: Events from Steps 3-5 lacked 9 required columns (sttl, dttl, state, sloss, dloss, ct_src_dport_ltm, ct_dst_src_ltm, _unsw_row_id, scenario_name)
-- **Solution**: Updated all event generation functions to extract and include all 23 columns from transformed CSV
-- **Files Modified**: step_3.py, step_4.py, step_5.py
-
-**Issue 2: Phase Architecture Event Count Mismatch** (FIXED ✅)
-- **Problem**: Phase architecture allocated only 8 slots for malicious events, but templates generated 10-11
-- **Solution**: Updated TEMPORAL_ARCHITECTURE to allocate 10-11 slots (4+4+2 or 4+4+3) per scenario
-- **Files Modified**: step_6.py
-
-**Issue 3: Unicode Encoding on Windows** (FIXED ✅)
-- **Problem**: Print statements with emoji checkmarks (✓✅❌⚠) caused UnicodeEncodeError on Windows terminal
-- **Solution**: Replaced all emoji with ASCII text ([OK], [FAIL], [WARN])
-- **Files Modified**: main.py, step_1.py, step_2.py, step_3.py, step_4.py, step_5.py, step_6.py, fill_feature_constraints.py
 
 ---
 
