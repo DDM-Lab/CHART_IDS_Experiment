@@ -124,7 +124,7 @@ From `network_topology_output.json`:
 **Key Achievements**:
 - **Input**: 175,341 rows (raw UNSW-NB15) — pre-transformed on Google Drive
 - **Output**: 876,705 rows (5 scenarios × 175,341 UNSW rows) — loaded from Google Drive
-- **Schema**: 23 columns (21 output + 2 tracking)
+- **Schema**: 33 columns total (5 metadata + 6 parameter tracking + 21 core schema + 2 tracking + 2 event context)
 - **IP Assignment**: Uses concrete IPs from network_topology_output.json for all internal hosts ✅
 - **External IP Generation**: Deterministic hash-based (MD5) for external hosts only ✅
 - **Host-to-IP Mapping**: Sourced from network_topology_output.json (user/enterprise/operational subnets) ✅
@@ -348,9 +348,11 @@ objective: 3 events
 ```
 
 **Events stored in templates** with fields:
-- timestamp, src_host, dst_host, src_subnet, dst_subnet
+- timestamp, src_host, dst_host, src_ip, dst_ip, src_subnet, dst_subnet
 - proto, sport, dport, service
 - duration, bytes, packets
+- sttl, dttl, state, sloss, dloss
+- ct_src_dport_ltm, ct_dst_src_ltm
 - attack_cat, label ('Malicious')
 - phase, _source ('UNSW_actual' for TIER 1)
 
@@ -391,14 +393,14 @@ objective: 3 events
 - **Temporal Spread**: Benign events uniformly distributed (not clustered in malicious phases)
 
 **Events stored in templates** with fields:
-- timestamp, src_host, dst_host, src_subnet, dst_subnet
-- src_ip, dst_ip
+- timestamp, src_host, dst_host, src_ip, dst_ip, src_subnet, dst_subnet
 - proto, sport, dport, service
 - duration, bytes, packets, sbytes, dbytes, spkts, dpkts
-- attack_cat ('Normal'), label ('Benign')
-- state, sttl, dttl, sloss, dloss
+- sttl, dttl, state, sloss, dloss
 - ct_src_dport_ltm, ct_dst_src_ltm
+- attack_cat ('Normal'), label ('Benign')
 - _source ('UNSW_benign')
+- phase (null for benign events)
 
 **Verification** (per scenario):
 ```
@@ -461,14 +463,14 @@ objective: 3 events
    ```
 
 **Events stored in templates** with fields:
-- timestamp, src_host, dst_host, src_subnet, dst_subnet
-- src_ip, dst_ip
+- timestamp, src_host, dst_host, src_ip, dst_ip, src_subnet, dst_subnet
 - proto, sport, dport, service
 - duration, bytes, packets, sbytes, dbytes, spkts, dpkts
-- attack_cat ('Normal'), label ('False Alarm')
-- state, sttl, dttl, sloss, dloss
+- sttl, dttl, state, sloss, dloss
 - ct_src_dport_ltm, ct_dst_src_ltm
+- attack_cat ('Normal'), label ('False Alarm')
 - _source ('synthetic_false_alarm_type1/2/3')
+- phase (null for false alarm events)
 
 **Verification Results** (all 5 scenarios, April 18, 2026):
 
@@ -536,8 +538,8 @@ label: False Alarm
 **Key Achievements**:
 - ✅ Assembled all events (malicious + benign + false alarms) per scenario
 - ✅ Assigned deterministic timestamps using phase-based temporal architecture
-- ✅ Validated exactly 30 events (or 29-31 for flexibility with 10-11 malicious)
-- ✅ Preserved all 23 columns (21 schema + 2 tracking)
+- ✅ Validated exactly 30 events (or parameterized count per TOTAL_EVENTS_PER_TABLE)
+- ✅ Preserved all 33 columns (5 metadata + 6 parameter tracking + 21 core schema + 2 tracking + 2 event context)
 - ✅ Sorted events chronologically by timestamp
 - ✅ Generated output CSV files with correct column ordering
 
@@ -564,10 +566,13 @@ Each scenario uses a 1800-second observation window divided into phases:
 4. All: Sorted chronologically for final output
 
 **CSV Output Structure**:
-- **Location**: `IDS_tables/{scenario}_30_events.csv`
-- **Columns**: 23 (exact ordering preserved)
-  1. timestamp (float, seconds)
-  2-23: All UNSW schema columns + tracking (_unsw_row_id, scenario_name)
+- **Location**: `IDS_tables/{scenario}_{total_events}_events.csv` (e.g., `WannaCry_18events.csv`)
+- **Columns**: 33 total (metadata + parameter tracking + core schema + tracking + event context)
+  1-5. Metadata: id, _total_events_param, _false_alarm_pct_param, _malicious_count_param, _benign_count_param
+  6. _false_alarm_count_param
+  7-29. Core schema (23 columns): timestamp, src_host, dst_host, src_ip, dst_ip, src_subnet, dst_subnet, proto, sport, dport, service, duration, bytes, packets, sttl, dttl, state, sloss, dloss, ct_src_dport_ltm, ct_dst_src_ltm, attack_cat, label
+  30-31. Tracking: _unsw_row_id, scenario_name
+  32-33. Event context: _source, phase
 - **Validation**: Timestamps strictly increasing, all in range [0, 1800]
 
 **Validation Report** (April 18, 2026):
@@ -581,12 +586,14 @@ Each scenario uses a 1800-second observation window divided into phases:
 | passwd_gzip_scp | 30 | 10 | 15 | 5 | ✅ Pass |
 
 **Quality Checks**:
-- ✅ All 23 columns present
+- ✅ All 33 columns present
 - ✅ Timestamps strictly ordered (increasing)
 - ✅ Event distributions within acceptable ranges
 - ✅ All events have valid labels (Malicious, Benign, False Alarm)
 - ✅ All rows have matching column counts
 - ✅ No null values in critical columns
+- ✅ Metadata columns (_total_events_param, etc.) consistent across all rows
+- ✅ Tracking columns (_source, phase) properly populated for event provenance
 
 **Key Implementation Functions**:
 - `assign_timestamps_to_events()`: Distributes events across temporal phases
@@ -599,10 +606,10 @@ Each scenario uses a 1800-second observation window divided into phases:
 ---
 
 ## Step 6: Final Assembly (COMPLETE)
-- Combine all 30 events per scenario (10-11 malicious + 15 benign + 5 false alarm)
+- Combine all events per scenario (malicious + benign + false alarm)
 - Sort chronologically by timestamp
-- Remove tracking columns (_source, _step* fields)
-- Output: `{scenario}_30_events.csv` (5 files total)
+- Preserve all 33 columns (metadata, parameters, schema, tracking, event context)
+- Output: `{scenario}_{total}events.csv` (parameterized by TOTAL_EVENTS_PER_TABLE)
 
 ---
 
@@ -613,7 +620,7 @@ Each scenario uses a 1800-second observation window divided into phases:
 | **UNSW Input Rows** | 175,341 |
 | **Pre-Step Output Rows** | 876,705 |
 | **Scenarios** | 5 |
-| **Output Schema Columns** | 21 (+ 2-3 tracking) |
+| **Output Schema Columns** | 33 (5 metadata + 6 param tracking + 21 core schema + 2 tracking + 2 event context) |
 | **All Scenarios TIER** | 1 (sufficient data) |
 | **Network Hosts** | 15 internal + unlimited external |
 | **Network Subnets** | 3 internal (+ 1 external) |
@@ -633,8 +640,10 @@ Each scenario uses a 1800-second observation window divided into phases:
 - [x] Pre-Step transforms all UNSW rows
 - [x] Internal host IPs sourced from network_topology_output.json
 - [x] External IP generation is deterministic (MD5-based)
-- [x] All 21 output columns populated
+- [x] All 33 output columns present (5 metadata + 6 param + 21 schema + 2 tracking + 2 context)
+- [x] Metadata columns populated for reproducibility
 - [x] Tracking columns present for auditing
+- [x] Event context columns (_source, phase) populated
 - [x] Global constraints properly defined
 - [x] Template validation catches errors
 - [x] Scenario filtering isolates per-scenario data
@@ -649,9 +658,10 @@ Each scenario uses a 1800-second observation window divided into phases:
 - [x] Step 4 benign events generated with service diversity
 - [x] Benign events uniformly distributed across time window
 - [x] Routing constraints enforced for benign traffic
-- [x] False alarm taxonomy field names standardized (3-type with consistent _source values)
+- [x] False alarm taxonomy field names standardized (3-type)
 - [x] Step 5 implemented (false alarms with 3-type taxonomy, UNSW-grounded)
-- [x] Step 6 implemented (final assembly and temporal ordering CSV output)
+- [x] Step 6 implemented (final assembly, temporal ordering, all 33 columns in output CSV)
+- [x] Column documentation in global_constraints.json matches actual CSV output
 
 ---
 

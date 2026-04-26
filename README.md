@@ -229,15 +229,25 @@ FA_TYPE_RATIO_MODE = "volume_heavy"  # Hard-to-detect anomalies
 
 ## 📊 Output Dataset Format
 
-Each CSV file contains 30 network traffic records with these columns:
+Each CSV file contains **parameterized number of network traffic records** (18-45 events per scenario, configurable via `TOTAL_EVENTS_PER_TABLE` in main.py) with **33 columns**:
+
+**Column Groups**:
+- **Metadata (5)**: `id`, `_total_events_param`, `_false_alarm_pct_param`, `_malicious_count_param`, `_benign_count_param`
+- **Core Schema (23)**: Network flow data (listed below)
+- **Tracking (2)**: `_unsw_row_id`, `scenario_name` (audit trail)
+- **Event Context (2)**: `_source` (event origin), `phase` (temporal phase for malicious events)
+
+**Core Schema Columns (23)**:
 
 | Column | Type | Example | Meaning |
 |--------|------|---------|---------|
 | `timestamp` | float | 123.45 | Seconds since observation window start (0-1800s) |
-| `src_host` | str | user_host_1 | Source hostname |
-| `dst_host` | str | web_server_1 | Destination hostname |
-| `src_subnet` | str | User | Source subnet (User/Enterprise/Operational) |
-| `dst_subnet` | str | Enterprise | Destination subnet |
+| `src_host` | str | User1 | Source hostname |
+| `dst_host` | str | Enterprise0 | Destination hostname |
+| `src_ip` | str | 10.0.1.11 | Source IP address |
+| `dst_ip` | str | 10.0.2.10 | Destination IP address |
+| `src_subnet` | str | Subnet 1 (User) | Source subnet |
+| `dst_subnet` | str | Subnet 2 (Enterprise) | Destination subnet |
 | `proto` | str | tcp | Protocol (tcp/udp) |
 | `sport` | int | 52341 | Source port |
 | `dport` | int | 22 | Destination port |
@@ -245,21 +255,45 @@ Each CSV file contains 30 network traffic records with these columns:
 | `duration` | float | 45.3 | Connection duration (seconds) |
 | `bytes` | int | 12500 | Total bytes transferred |
 | `packets` | int | 87 | Total packets |
+| `sttl` | int | 64 | Source TTL |
+| `dttl` | int | 62 | Destination TTL |
+| `state` | str | FIN | Connection state |
+| `sloss` | int | 0 | Source packet loss |
+| `dloss` | int | 0 | Destination packet loss |
+| `ct_src_dport_ltm` | int | 2 | Count connections by source to same dest port |
+| `ct_dst_src_ltm` | int | 3 | Count unique dest IPs from same source |
 | `attack_cat` | str | Normal | Attack category (from UNSW) |
 | **`label`** | **str** | **Malicious** | **Class label: Malicious / Benign / False Alarm** |
-| *(and 8 more UNSW features)* | | | state, sttl, dttl, sloss, dloss, sbytes, spkts, ct_src_dport_ltm, ct_dst_src_ltm |
 
-**Key field**: `label` — use this for supervised learning / IDS evaluation.
+**Key fields**:
+- `label` — use for supervised learning / IDS evaluation
+- `_source` — identifies event provenance (real UNSW vs. synthetic)
+- `phase` — temporal phase annotation for malicious events
+
+*Full column documentation: [templates/global_constraints.json](templates/global_constraints.json) (output_schema section)*
 
 ## 🔍 Understanding Your Dataset
 
-### Event Composition (Default: 30 events)
+### Event Composition (Parameterized)
+
+**Configuration** (set in main.py):
+```python
+TOTAL_EVENTS_PER_TABLE = 18           # Range: 18-45
+FALSE_ALARM_BIN = "high"             # 0%-30% false alarm rate
+FA_TYPE_RATIO_MODE = "balanced"      # Type 1:2:3 ratio
 ```
-Total: 30 events
-├─ Malicious attacks: 10-11 events (33-37%)
-├─ Benign traffic: 15 events (50%)
-└─ False alarms: 4-5 events (15%)
+
+**Example: With total=18, FA_pct=30%**:
 ```
+Total: 18 events
+├─ Malicious attacks: 7-11 (scenario-specific, fixed)
+├─ Benign traffic: computed as (total - malicious - false_alarm)
+└─ False alarms: round(18 × 0.30) = 5 (configurable)
+```
+
+**Malicious event counts per scenario** (fixed in templates):
+- WannaCry: 11 | Data_Theft: 9 | ShellShock: 9
+- Netcat_Backdoor: 7 | passwd_gzip_scp: 7 | No_Attack: 0
 
 ### Attack Scenarios (5 per run)
 - **WannaCry**: Ransomware propagation pattern
