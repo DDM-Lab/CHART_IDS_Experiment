@@ -125,16 +125,18 @@ From `network_topology_output.json`:
 - **Input**: 175,341 rows (raw UNSW-NB15) — pre-transformed on Google Drive
 - **Output**: 876,705 rows (5 scenarios × 175,341 UNSW rows) — loaded from Google Drive
 - **Schema**: 23 columns (21 output + 2 tracking)
-- **Synthetic IP Generation**: Deterministic from `row_id + attack_cat` ✅
-- **Scenario-Specific Mapping**: MD5(scenario + IP) for deterministic host assignment ✅
+- **IP Assignment**: Uses concrete IPs from network_topology_output.json for all internal hosts ✅
+- **External IP Generation**: Deterministic hash-based (MD5) for external hosts only ✅
+- **Host-to-IP Mapping**: Sourced from network_topology_output.json (user/enterprise/operational subnets) ✅
 - **Validation**: 12 comprehensive checks including TTL ranges, metric non-negativity ✅
 
 **Quality Indicators**:
 ```
 ✓ Row count: 876,705 (175,341 UNSW × 5 scenarios)
 ✓ No nulls in critical columns (7 checked)
-✓ All hosts valid (15 unique hosts across all scenarios)
-✓ All subnets valid (4 unique: 3 internal + 1 external)
+✓ All hosts valid (15 unique hosts from network_topology_output.json)
+✓ All subnets valid (3 internal subnets: User, Enterprise, Operational)
+✓ All IPs sourced from network_topology_output.json (not synthetic)
 ✓ TTL values in valid range (0-255)
 ✓ All metrics non-negative
 ✓ Scenario distribution: 175,341 rows per scenario
@@ -297,8 +299,9 @@ required_fad = [
 ## ✅ Helper Functions Coverage
 
 All utilities in place:
-- ✅ Network topology (IP→subnet, host validation)
-- ✅ Deterministic mappings (IP→host via MD5)
+- ✅ Network topology (IP→subnet, host validation from network_topology_output.json)
+- ✅ Concrete IP assignment (retrieves from network_topology_output.json for internal hosts)
+- ✅ External IP generation (deterministic MD5-based for external hosts only)
 - ✅ Port/service inference (reverse mappings)
 - ✅ Validation suite (host, subnet, service, attack_cat)
 - ✅ Scenario definitions (SCENARIOS constant)
@@ -371,7 +374,7 @@ config = PipelineConfig(
   - progression phase (T=350-600s)
   - objective phase (T=600-900s)
 - **TIER 1 sampling** ✅ (all scenarios had ≥10 UNSW rows)
-- **Deterministic host mapping** ✅ (preserves topology via MD5 hash)
+- **Host assignment from network topology** ✅ (uses concrete IPs from network_topology_output.json)
 - **Timestamps strictly increasing** ✅ (0-1800s window)
 
 **Phase Distribution** (example: WannaCry):
@@ -401,7 +404,7 @@ objective: 3 events
 - **15 benign events per scenario** ✅
 - **Scenario-independent sampling** ✅ (pooled from all scenarios' 'Normal' traffic)
 - **Service diversity** ✅ (HTTP, DNS, SSH, FTP, SMTP, RDP)
-- **Topology-aware host assignment** ✅ (MD5-based deterministic mapping)
+- **Topology-aware host assignment** ✅ (uses concrete IPs from network_topology_output.json)
 - **Routing constraints enforced** ✅ (no direct User ↔ Operational)
 - **Uniform temporal distribution** ✅ (spread across [0, 1800] seconds)
 - **Realistic feature ranges** ✅ (per-service constraints applied)
@@ -421,7 +424,7 @@ objective: 3 events
 - **Scenario-Independent**: IDS has no prior knowledge of specific zero-day → benign baseline is generic
 - **Pooled Sampling**: Prevents scenarios from sharing the same benign events
 - **Service Variety**: Realistic enterprise traffic includes multiple protocols
-- **Topology Preservation**: Deterministic host mapping maintains realistic network structure
+- **Topology Preservation**: IPs sourced from network_topology_output.json for concrete AWS hosts
 - **Temporal Spread**: Benign events uniformly distributed (not clustered in malicious phases)
 
 **Events stored in templates** with fields:
@@ -684,8 +687,8 @@ Each scenario uses a 1800-second observation window divided into phases:
 ## ✅ Verification Checklist
 
 - [x] Pre-Step transforms all UNSW rows
-- [x] Synthetic IP generation is deterministic
-- [x] Host mapping is scenario-specific
+- [x] Internal host IPs sourced from network_topology_output.json
+- [x] External IP generation is deterministic (MD5-based)
 - [x] All 21 output columns populated
 - [x] Tracking columns present for auditing
 - [x] Global constraints properly defined

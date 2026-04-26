@@ -21,24 +21,90 @@ The generated datasets respect:
 
 ## ⚠️ Important: Dataset Storage on Google Drive
 
-The UNSW-NB15 transformed dataset is **too large to store in GitHub** and is hosted on Google Drive instead:
+The UNSW-NB15 datasets are **too large to store in GitHub** and are hosted on Google Drive instead. This pipeline supports two workflows:
 
+### 📦 Default Workflow: Using Pre-Transformed Dataset (Recommended)
+
+By default, the pipeline uses the **pre-transformed dataset**, which has already been processed and is ready to use immediately:
+
+**Transformed Dataset Location**:
 ```
-G:\.shortcut-targets-by-id\1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i\2025GraceRoessling\2025FriendFoeCollaborationYinuo\Documentation\IDS_zero_day_generation\ground_truth_dataset\UNSW_NB15_transformed.csv
+G:\.shortcut-targets-by-id
+  └─ 1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i
+     └─ 2025GraceRoessling
+        └─ 2025FriendFoeCollaborationYinuo
+           └─ Documentation
+              └─ IDS_zero_day_generation
+                 └─ ground_truth_dataset
+                    └─ UNSW_NB15_transformed.csv  ← Default dataset used
 ```
 
-### Google Drive Setup
+**Setup**:
+1. Ensure Google Drive is mounted/accessible on your machine
+2. Open File Explorer and navigate to `G:\` — you should see `.shortcut-targets-by-id` folder
+3. If the path doesn't work, update `output_transformed_csv` in `helper_functions.py` with your actual Google Drive path
 
-1. **Ensure Google Drive access**: The above path assumes a Google Drive shortcut is set up on your machine
-2. **Verify the path**: 
-   - Open File Explorer and navigate to `G:\` 
-   - You should see `.shortcut-targets-by-id` folder
-   - If this doesn't work, mount Google Drive or update the path in `helper_functions.py`
+### 🔬 Advanced Workflow: Transforming from Original Dataset
 
-3. **Alternative setup** (if using different folder structure):
-   - Edit `helper_functions.py`
-   - Find the line with `output_transformed_csv = Path(r"G:\...")`
-   - Replace with your actual path to `UNSW_NB15_transformed.csv`
+If you want to start from the original UNSW-NB15 dataset and transform it yourself, this section explains how.
+
+#### Original Dataset Location (Google Drive)
+
+Both the original and transformed datasets are stored in the same Google Drive folder:
+
+**Original Dataset**:
+```
+G:\.shortcut-targets-by-id
+  └─ 1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i
+     └─ 2025GraceRoessling
+        └─ 2025FriendFoeCollaborationYinuo
+           └─ Documentation
+              └─ IDS_zero_day_generation
+                 └─ ground_truth_dataset
+                    └─ UNSW_NB15_training-set(in).csv  ← Original dataset (input)
+```
+
+#### Where the Original Dataset Comes From
+
+The original UNSW-NB15 dataset is sourced from the official UNSW project website:
+
+**Website**: [UNSW-NB15 Dataset](https://research.unsw.edu.au/projects/unsw-nb15-dataset)
+
+**How to Download from the Website**:
+1. Visit https://research.unsw.edu.au/projects/unsw-nb15-dataset
+2. Follow the path: **OneDrive → CVS Files → Training and Testing Sets →** `UNSW_NB15_training-set.csv`
+3. Download the CSV file and save it to your Google Drive at the path shown above
+
+**Note**: The Google Drive folder already contains this file, so you don't need to download it unless you want to refresh the original dataset.
+
+#### Running the Transformation (pre_step.py)
+
+The `pre_step.py` file contains the transformation logic that converts the original dataset into the format used by the pipeline:
+
+**What pre_step.py does**:
+- Takes `UNSW_NB15_training-set(in).csv` as input
+- Adds scenario labels (WannaCry, Data_Theft, ShellShock, etc.)
+- Assigns network topology information (subnets, hosts, IPs)
+- Expands each UNSW row across 5 scenarios
+- Outputs `UNSW_NB15_transformed.csv`
+
+**When to run pre_step.py**:
+- **Not normally** — the transformed file already exists on Google Drive
+- **Only if** you want to:
+  - Start from the original UNSW dataset instead of using the pre-transformed version
+  - Understand how the transformation works
+  - Modify the transformation logic for your own research
+
+**How to run pre_step.py manually**:
+1. Ensure the original dataset exists at the Google Drive path above
+2. Edit `helper_functions.py` and update these paths:
+   ```python
+   input_unsw_csv = Path(r"G:\.shortcut-targets-by-id\1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i\..\ground_truth_dataset\UNSW_NB15_training-set(in).csv")
+   output_transformed_csv = Path(r"G:\.shortcut-targets-by-id\1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i\..\ground_truth_dataset\UNSW_NB15_transformed.csv")
+   ```
+3. Run: `python pre_step.py`
+4. Wait for the transformation to complete (may take several minutes)
+5. The transformed CSV will be saved to the output path
 
 ## 📊 Quick Start
 
@@ -61,15 +127,12 @@ pip install pandas numpy scikit-learn
 
 3. **Verify Google Drive setup**:
    - Ensure Google Drive is mounted/accessible on your machine
-   - The pipeline expects the transformed UNSW dataset at:
-     ```
-     G:\.shortcut-targets-by-id\1zFPkx_p8sPRshZUcZ95mHkYUPR3dh1-i\2025GraceRoessling\2025FriendFoeCollaborationYinuo\Documentation\IDS_zero_day_generation\ground_truth_dataset\UNSW_NB15_transformed.csv
-     ```
-   - If your path differs, update `output_transformed_csv` in `helper_functions.py`
+   - The pipeline uses the transformed UNSW dataset by default (see section above)
+   - If your Google Drive path differs, update `output_transformed_csv` in `helper_functions.py`
 
 4. **Verify other required files**:
    - Template files in `templates/` should already be present
-   - No other external datasets needed
+   - No other external datasets needed beyond what's on Google Drive
 
 ### Generate a Dataset (5 minutes)
 
@@ -306,7 +369,10 @@ print(df.groupby('label').size() / len(df))
 - **Solution**: Verify Google Drive is mounted and accessible. Check that the path in `helper_functions.py` matches your Google Drive setup. You may need to mount Google Drive differently depending on your system.
 
 **Issue**: "No such file or directory: UNSW_NB15_transformed.csv"
-- **Solution**: This is a Google Drive path issue. Ensure the dataset file exists at the location specified in `helper_functions.py`.
+- **Solution**: This is a Google Drive path issue. Ensure the dataset file exists at the location specified in `helper_functions.py` (see the "Dataset Storage on Google Drive" section above).
+
+**Issue**: "Want to transform from the original UNSW dataset"
+- **Solution**: See the "Advanced Workflow: Transforming from Original Dataset" section above. Download the original dataset from the UNSW website, or use the copy in the Google Drive folder. Then run `pre_step.py` to transform it.
 
 **Issue**: "Invalid false_alarm_bin" error
 - **Solution**: Check spelling in main.py — must be one of: zero, very_conservative, conservative, standard, elevated, high
