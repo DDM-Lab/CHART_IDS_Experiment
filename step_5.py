@@ -408,6 +408,8 @@ def _generate_type1_unusual_port(scenario_name, base_row, timestamp, benign_stat
         'timestamp': timestamp,
         'src_host': src_host,
         'dst_host': dst_host,
+        'src_ip': src_ip,
+        'dst_ip': dst_ip,
         'src_subnet': src_subnet,
         'dst_subnet': dst_subnet,
         'proto': 'tcp',
@@ -482,6 +484,8 @@ def _generate_type2_high_volume(scenario_name, base_row, timestamp, benign_stats
         'timestamp': timestamp,
         'src_host': src_host,
         'dst_host': dst_host,
+        'src_ip': src_ip,
+        'dst_ip': dst_ip,
         'src_subnet': src_subnet,
         'dst_subnet': dst_subnet,
         'proto': 'tcp',
@@ -556,6 +560,8 @@ def _generate_type3_rare_duration(scenario_name, base_row, timestamp, benign_sta
         'timestamp': timestamp,
         'src_host': src_host,
         'dst_host': dst_host,
+        'src_ip': src_ip,
+        'dst_ip': dst_ip,
         'src_subnet': src_subnet,
         'dst_subnet': dst_subnet,
         'proto': 'tcp',
@@ -583,8 +589,7 @@ def _generate_type3_rare_duration(scenario_name, base_row, timestamp, benign_sta
     if not validate_host(event['src_host']):
         raise ValueError(f"Invalid src_host: {event['src_host']}")
     if not validate_subnet(event['src_subnet']):
-        raise ValueError(f"Invalid src_subnet: {event['src_subnet']}")
-    
+        raise ValueError(f"Invalid src_subnet: {event['src_subnet']}")    
     return event
 
 

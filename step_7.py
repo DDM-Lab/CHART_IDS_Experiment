@@ -442,6 +442,57 @@ def validate_constraint_6_defender_visibility(csv_path, topology_data, scenario_
     return errors
 
 
+def validate_constraint_7_ip_hostname_correspondence(csv_path, topology_data, scenario_name):
+    """
+    Constraint 7: IP addresses match expected values from network_topology_output.json
+    
+    For topology hosts (non-external), verify that:
+      - src_ip matches the IP assigned to src_host
+      - dst_ip matches the IP assigned to dst_host
+    
+    External hosts (external_*) are allowed without validation (represent internet IPs).
+    """
+    errors = []
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        return [f"  [Scenario: {scenario_name}] Failed to read CSV: {e}"]
+    
+    all_hosts = topology_data['all_hosts']
+    
+    # Check if src_ip and dst_ip columns exist
+    if 'src_ip' not in df.columns or 'dst_ip' not in df.columns:
+        return [f"  [Scenario: {scenario_name}] CSV missing src_ip or dst_ip columns"]
+    
+    for idx, row in df.iterrows():
+        src_host = row['src_host']
+        dst_host = row['dst_host']
+        src_ip = row['src_ip']
+        dst_ip = row['dst_ip']
+        
+        # Validate src_ip
+        if not str(src_host).startswith('external_'):
+            if src_host in all_hosts:
+                expected_src_ip = all_hosts[src_host]['ip']
+                if str(src_ip) != expected_src_ip:
+                    errors.append(
+                        f"  [Scenario: {scenario_name}, Row {idx+2}] src_host='{src_host}' has IP '{src_ip}', "
+                        f"but topology specifies '{expected_src_ip}'. Configuration mismatch."
+                    )
+        
+        # Validate dst_ip
+        if not str(dst_host).startswith('external_'):
+            if dst_host in all_hosts:
+                expected_dst_ip = all_hosts[dst_host]['ip']
+                if str(dst_ip) != expected_dst_ip:
+                    errors.append(
+                        f"  [Scenario: {scenario_name}, Row {idx+2}] dst_host='{dst_host}' has IP '{dst_ip}', "
+                        f"but topology specifies '{expected_dst_ip}'. Configuration mismatch."
+                    )
+    
+    return errors
+
+
 # ============================================================
 # MAIN VALIDATION ORCHESTRATOR
 # ============================================================
@@ -508,6 +559,7 @@ def validate_topology_step_7(
         ('IPs within subnet CIDR blocks', validate_constraint_4_ip_within_subnet_cidr),
         ('Malicious events follow attack path', validate_constraint_5_malicious_attack_path_sequence),
         ('Defender visibility', validate_constraint_6_defender_visibility),
+        ('IP-hostname correspondence', validate_constraint_7_ip_hostname_correspondence),
     ]
     
     all_errors = []

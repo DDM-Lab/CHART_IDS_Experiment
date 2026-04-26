@@ -301,7 +301,7 @@ def validate_30_event_table(events, scenario_name, expected_total=30, expected_m
     
     # Check 5: All required columns present
     required_columns = [
-        'timestamp', 'src_host', 'dst_host', 'src_subnet', 'dst_subnet',
+        'timestamp', 'src_host', 'dst_host', 'src_ip', 'dst_ip', 'src_subnet', 'dst_subnet',
         'proto', 'sport', 'dport', 'service', 'duration', 'bytes', 'packets',
         'sttl', 'dttl', 'state', 'sloss', 'dloss', 'ct_src_dport_ltm', 'ct_dst_src_ltm',
         'attack_cat', 'label', '_unsw_row_id', 'scenario_name'

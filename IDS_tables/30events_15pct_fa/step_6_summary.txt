@@ -2,7 +2,7 @@
 STEP 6: FINAL IDS TABLE ASSEMBLY WITH PARAMETERIZED COUNTS
 ================================================================================
 
-Timestamp: 2026-04-25 21:27:32.280135
+Timestamp: 2026-04-25 21:46:23.889011
 Output Directory: IDS_tables\30events_15pct_fa
 Total Events Per Table: 30
 False Alarm Percentage: 15%
@@ -14,7 +14,7 @@ Scenario: WannaCry
 ================================================================================
 CSV Path: IDS_tables\30events_15pct_fa\WannaCry_30events.csv
 Row Count: 30
-Total Columns (metadata + flow): 31
+Total Columns (metadata + flow): 33
 
 Metadata Columns (first 5):
   1. _total_events_param: 30
@@ -37,7 +37,7 @@ Scenario: Data_Theft
 ================================================================================
 CSV Path: IDS_tables\30events_15pct_fa\Data_Theft_30events.csv
 Row Count: 30
-Total Columns (metadata + flow): 31
+Total Columns (metadata + flow): 33
 
 Metadata Columns (first 5):
   1. _total_events_param: 30
@@ -60,7 +60,7 @@ Scenario: ShellShock
 ================================================================================
 CSV Path: IDS_tables\30events_15pct_fa\ShellShock_30events.csv
 Row Count: 30
-Total Columns (metadata + flow): 31
+Total Columns (metadata + flow): 33
 
 Metadata Columns (first 5):
   1. _total_events_param: 30
@@ -83,7 +83,7 @@ Scenario: Netcat_Backdoor
 ================================================================================
 CSV Path: IDS_tables\30events_15pct_fa\Netcat_Backdoor_30events.csv
 Row Count: 30
-Total Columns (metadata + flow): 31
+Total Columns (metadata + flow): 33
 
 Metadata Columns (first 5):
   1. _total_events_param: 30
@@ -106,7 +106,7 @@ Scenario: passwd_gzip_scp
 ================================================================================
 CSV Path: IDS_tables\30events_15pct_fa\passwd_gzip_scp_30events.csv
 Row Count: 30
-Total Columns (metadata + flow): 31
+Total Columns (metadata + flow): 33
 
 Metadata Columns (first 5):
   1. _total_events_param: 30
@@ -129,7 +129,7 @@ Scenario: No_Attack
 ================================================================================
 CSV Path: IDS_tables\30events_15pct_fa\No_Attack_30events.csv
 Row Count: 30
-Total Columns (metadata + flow): 30
+Total Columns (metadata + flow): 32
 
 Metadata Columns (first 5):
   1. _total_events_param: 30

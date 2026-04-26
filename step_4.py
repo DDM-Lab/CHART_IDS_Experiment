@@ -314,6 +314,8 @@ def _generate_benign_events_for_scenario(scenario_name, pooled_benign_df, templa
             'timestamp': timestamps[idx],
             'src_host': src_host,
             'dst_host': dst_host,
+            'src_ip': src_ip,
+            'dst_ip': dst_ip,
             'src_subnet': src_subnet,
             'dst_subnet': dst_subnet,
             'proto': proto,
