@@ -729,3 +729,510 @@ Each scenario uses a 1800-second observation window divided into phases:
 | IDS_generation_method.md | 📖 Reference | 850+ | Implementation guide (includes topology details) |
 | ids_pipeline_remediation.md | 📖 Reference | 400+ | Gap analysis & solutions |
 
+---
+
+## 🔧 Recommended Refactoring: Configuration-Driven Hardcoded Values
+
+### Overview
+
+The pipeline currently has **two-tier configuration management**: 
+- **Active Tier**: `network_topology_output.json` is actively read and drives IP assignment (highly integrated)
+- **Supplementary Tier**: `global_constraints.json` documents experiment rules but is NOT actively used for component initialization
+
+This creates a maintenance burden where hardcoded values in Python code diverge from the specification in `global_constraints.json`. The refactoring makes `global_constraints.json` the true source of truth for all behavioral parameters, enabling:
+
+1. **Configuration-driven experiments**: Change behavior without modifying code
+2. **Reproducible research**: Config files serve as experiment descriptors
+3. **Parameter sweeps**: Generate multiple configs for systematic evaluation
+4. **Maintainability**: Single source of truth reduces bugs and improves clarity
+
+### Current State vs. Desired State
+
+**Currently (Hardcoded)**:
+- Phase structure: Hardcoded in `step_2.py` lines 139-175
+- Service definitions: Hardcoded in `step_4.py` lines 20-83
+- False alarm thresholds: Hardcoded in `step_5.py` lines 350-615
+- Metadata defaults: Hardcoded across all generation steps (sttl=64, dttl=64, state='CON')
+- Observation window: Hardcoded as 1800 seconds throughout pipeline
+
+**Desired**: All above parameters read from `global_constraints.json` with fallbacks for validation
+
+### Implementation Steps
+
+#### Step 1: Expand global_constraints.json Schema
+
+Add five new top-level sections to `global_constraints.json`:
+
+**1a. temporal_architecture** (for phase structure):
+```json
+"temporal_architecture": {
+  "observation_window_seconds": 1800,
+  "phase_definition": [
+    {
+      "name": "phase_1",
+      "time_range": {"start": 0, "end": 300},
+      "events_per_host": 6,
+      "description": "Initial reconnaissance and scanning"
+    },
+    {
+      "name": "phase_2",
+      "time_range": {"start": 300, "end": 600},
+      "events_per_host": 3,
+      "description": "Mid-phase exploration"
+    },
+    {
+      "name": "phase_3",
+      "time_range": {"start": 600, "end": 900},
+      "events_per_host": 3,
+      "description": "Secondary probing"
+    },
+    {
+      "name": "phase_4",
+      "time_range": {"start": 900, "end": 1200},
+      "events_per_host": 2,
+      "description": "Consolidation phase"
+    },
+    {
+      "name": "phase_5",
+      "time_range": {"start": 1200, "end": 1800},
+      "events_per_host": 9,
+      "description": "Exploitation and exfiltration"
+    }
+  ]
+}
+```
+
+**1b. service_definitions** (port ranges, duration, byte specifications):
+```json
+"service_definitions": {
+  "http": {
+    "port": 80,
+    "duration_seconds": {"min": 0.5, "max": 30},
+    "bytes": {"min": 500, "max": 524288},
+    "protocols": ["TCP"],
+    "description": "HTTP web traffic"
+  },
+  "dns": {
+    "port": 53,
+    "duration_seconds": {"min": 0.01, "max": 2},
+    "bytes": {"min": 50, "max": 1000},
+    "protocols": ["UDP", "TCP"],
+    "description": "DNS queries"
+  },
+  "ssh": {
+    "port": 22,
+    "duration_seconds": {"min": 10, "max": 600},
+    "bytes": {"min": 200, "max": 102400},
+    "protocols": ["TCP"],
+    "description": "SSH remote access"
+  },
+  "ssh_admin": {
+    "port": 22,
+    "duration_seconds": {"min": 10, "max": 600},
+    "bytes": {"min": 200, "max": 102400},
+    "protocols": ["TCP"],
+    "description": "SSH admin/interactive sessions"
+  },
+  "ftp": {
+    "port": 21,
+    "duration_seconds": {"min": 5, "max": 120},
+    "bytes": {"min": 102400, "max": 10485760},
+    "protocols": ["TCP"],
+    "description": "File transfer protocol"
+  },
+  "smtp": {
+    "port": 25,
+    "duration_seconds": {"min": 1, "max": 30},
+    "bytes": {"min": 1024, "max": 102400},
+    "protocols": ["TCP"],
+    "description": "Email transmission"
+  },
+  "rdp": {
+    "port": 3389,
+    "duration_seconds": {"min": 30, "max": 1800},
+    "bytes": {"min": 5120, "max": 524288},
+    "protocols": ["TCP"],
+    "description": "Remote desktop protocol"
+  }
+}
+```
+
+**1c. false_alarm_generation** (type-specific thresholds):
+```json
+"false_alarm_generation": {
+  "type_1_unusual_port": {
+    "description": "Traffic on unexpected high ports",
+    "port_range": {"min": 10000, "max": 65535},
+    "allowed_services": ["dns", "http", "smtp"],
+    "allowed_hosts": ["enterprise"],
+    "duration_seconds": {"min": 0.5, "max": 30},
+    "bytes": {"min": 100, "max": 10000}
+  },
+  "type_2_high_volume": {
+    "description": "Unusually high volume for service",
+    "bytes_multiplier": {"min": 2, "max": 5},
+    "allowed_services": ["dns", "smtp"],
+    "allowed_hosts": ["user", "enterprise"],
+    "duration_seconds": {"min": 0.5, "max": 30}
+  },
+  "type_3_rare_duration": {
+    "description": "Unusually long duration for service",
+    "duration_multiplier": {"min": 3, "max": 10},
+    "allowed_services": ["ssh_admin"],
+    "allowed_hosts": ["enterprise"],
+    "port_range": {"min": 1024, "max": 65535}
+  }
+}
+```
+
+**1d. metadata_defaults** (TTL, loss, state values):
+```json
+"metadata_defaults": {
+  "source_ttl": 64,
+  "destination_ttl": 64,
+  "source_loss_percent": 0,
+  "destination_loss_percent": 0,
+  "connection_state": "CON",
+  "description": "Default values for network metadata fields across all events"
+}
+```
+
+#### Step 2: Update Helper Functions
+
+**In `helper_functions.py`**: Create new configuration loader functions (after line 1350):
+
+```python
+def load_temporal_architecture(global_constraints: dict) -> dict:
+    """Extract and validate temporal architecture from global_constraints."""
+    try:
+        temporal = global_constraints.get('temporal_architecture', {})
+        phases = temporal.get('phase_definition', [])
+        observation_window = temporal.get('observation_window_seconds', 1800)
+        
+        if not phases:
+            raise ValueError("phase_definition cannot be empty")
+        
+        # Validate phase structure
+        for i, phase in enumerate(phases):
+            required = ['name', 'time_range', 'events_per_host']
+            if not all(k in phase for k in required):
+                raise ValueError(f"Phase {i} missing required fields: {required}")
+        
+        return {
+            'phases': phases,
+            'observation_window': observation_window
+        }
+    except (KeyError, TypeError) as e:
+        # Fallback to hardcoded defaults
+        logging.warning(f"Failed to load temporal architecture: {e}. Using defaults.")
+        return _get_default_temporal_architecture()
+
+def load_service_definitions(global_constraints: dict) -> dict:
+    """Extract and validate service definitions from global_constraints."""
+    try:
+        services = global_constraints.get('service_definitions', {})
+        
+        if not services:
+            raise ValueError("service_definitions cannot be empty")
+        
+        # Validate each service has required fields
+        for service_name, service_def in services.items():
+            required = ['port', 'duration_seconds', 'bytes', 'protocols']
+            if not all(k in service_def for k in required):
+                raise ValueError(f"Service '{service_name}' missing required fields: {required}")
+        
+        return services
+    except (KeyError, TypeError) as e:
+        logging.warning(f"Failed to load service definitions: {e}. Using defaults.")
+        return _get_default_service_definitions()
+
+def load_false_alarm_config(global_constraints: dict) -> dict:
+    """Extract and validate false alarm generation parameters from global_constraints."""
+    try:
+        fa_config = global_constraints.get('false_alarm_generation', {})
+        
+        if not fa_config:
+            raise ValueError("false_alarm_generation cannot be empty")
+        
+        required_types = ['type_1_unusual_port', 'type_2_high_volume', 'type_3_rare_duration']
+        if not all(t in fa_config for t in required_types):
+            raise ValueError(f"false_alarm_generation missing required types: {required_types}")
+        
+        return fa_config
+    except (KeyError, TypeError) as e:
+        logging.warning(f"Failed to load false alarm config: {e}. Using defaults.")
+        return _get_default_false_alarm_config()
+
+def load_metadata_defaults(global_constraints: dict) -> dict:
+    """Extract and validate metadata default values from global_constraints."""
+    try:
+        defaults = global_constraints.get('metadata_defaults', {})
+        
+        required = ['source_ttl', 'destination_ttl', 'source_loss_percent', 
+                    'destination_loss_percent', 'connection_state']
+        if not all(k in defaults for k in required):
+            raise ValueError(f"metadata_defaults missing required fields: {required}")
+        
+        return defaults
+    except (KeyError, TypeError) as e:
+        logging.warning(f"Failed to load metadata defaults: {e}. Using defaults.")
+        return _get_default_metadata_defaults()
+```
+
+Then add the fallback functions:
+```python
+def _get_default_temporal_architecture() -> dict:
+    """Hardcoded fallback for temporal architecture."""
+    return {
+        'phases': [
+            {'name': 'phase_1', 'time_range': {'start': 0, 'end': 300}, 'events_per_host': 6},
+            {'name': 'phase_2', 'time_range': {'start': 300, 'end': 600}, 'events_per_host': 3},
+            {'name': 'phase_3', 'time_range': {'start': 600, 'end': 900}, 'events_per_host': 3},
+            {'name': 'phase_4', 'time_range': {'start': 900, 'end': 1200}, 'events_per_host': 2},
+            {'name': 'phase_5', 'time_range': {'start': 1200, 'end': 1800}, 'events_per_host': 9}
+        ],
+        'observation_window': 1800
+    }
+
+def _get_default_service_definitions() -> dict:
+    """Hardcoded fallback for service definitions."""
+    # Return the service dict from step_4.py lines 20-83
+    return SERVICES  # (existing hardcoded dict, now centralized)
+
+def _get_default_false_alarm_config() -> dict:
+    """Hardcoded fallback for false alarm configuration."""
+    return {
+        'type_1_unusual_port': {
+            'port_range': {'min': 10000, 'max': 65535},
+            'allowed_services': ['dns', 'http', 'smtp']
+        },
+        'type_2_high_volume': {
+            'bytes_multiplier': {'min': 2, 'max': 5},
+            'allowed_services': ['dns', 'smtp']
+        },
+        'type_3_rare_duration': {
+            'duration_multiplier': {'min': 3, 'max': 10},
+            'allowed_services': ['ssh_admin']
+        }
+    }
+
+def _get_default_metadata_defaults() -> dict:
+    """Hardcoded fallback for metadata defaults."""
+    return {
+        'source_ttl': 64,
+        'destination_ttl': 64,
+        'source_loss_percent': 0,
+        'destination_loss_percent': 0,
+        'connection_state': 'CON'
+    }
+```
+
+#### Step 3: Update step_2.py (Temporal Architecture)
+
+**Replace lines 139-175** in `step_2.py` (the hardcoded `get_standard_phases()` function):
+
+```python
+def get_standard_phases(global_constraints):
+    """Load temporal phase structure from global_constraints with fallback."""
+    try:
+        temporal = global_constraints.get('temporal_architecture', {})
+        phases = temporal.get('phase_definition', [])
+        observation_window = temporal.get('observation_window_seconds', 1800)
+        
+        if not phases:
+            raise ValueError("No phase definition found in global_constraints")
+        
+        return {phase['name']: phase for phase in phases}, observation_window
+    except Exception as e:
+        logging.warning(f"Failed to load phases from config: {e}. Using hardcoded defaults.")
+        # Hardcoded fallback
+        return {
+            'phase_1': {'start': 0, 'end': 300, 'events_per_host': 6},
+            'phase_2': {'start': 300, 'end': 600, 'events_per_host': 3},
+            'phase_3': {'start': 600, 'end': 900, 'events_per_host': 3},
+            'phase_4': {'start': 900, 'end': 1200, 'events_per_host': 2},
+            'phase_5': {'start': 1200, 'end': 1800, 'events_per_host': 9}
+        }, 1800
+```
+
+**Impact**: Changes how phases are retrieved in `step_2.py line 302` - no code change needed there, just the function definition.
+
+#### Step 4: Update step_4.py (Service Definitions)
+
+**Replace lines 20-83** (the hardcoded `SERVICES` dict) with:
+
+```python
+def get_service_definitions(global_constraints):
+    """Load service definitions from global_constraints with fallback."""
+    try:
+        services = global_constraints.get('service_definitions', {})
+        if not services:
+            raise ValueError("No service definitions found in global_constraints")
+        return services
+    except Exception as e:
+        logging.warning(f"Failed to load service definitions: {e}. Using hardcoded defaults.")
+        return {
+            'http': {'port': 80, 'duration_seconds': [0.5, 30], 'bytes': [500, 524288]},
+            'dns': {'port': 53, 'duration_seconds': [0.01, 2], 'bytes': [50, 1000]},
+            'ssh': {'port': 22, 'duration_seconds': [10, 600], 'bytes': [200, 102400]},
+            'ftp': {'port': 21, 'duration_seconds': [5, 120], 'bytes': [102400, 10485760]},
+            'smtp': {'port': 25, 'duration_seconds': [1, 30], 'bytes': [1024, 102400]},
+            'rdp': {'port': 3389, 'duration_seconds': [30, 1800], 'bytes': [5120, 524288]}
+        }
+```
+
+**Then update line 49+** in `step_4.py` to use this function:
+```python
+SERVICES = get_service_definitions(global_constraints)
+```
+
+#### Step 5: Update step_5.py (False Alarm Configuration)
+
+**Extract false alarm thresholds from lines 350-615** and replace with:
+
+```python
+def get_false_alarm_config(global_constraints):
+    """Load false alarm type thresholds from global_constraints with fallback."""
+    try:
+        fa_config = global_constraints.get('false_alarm_generation', {})
+        if not fa_config:
+            raise ValueError("No false alarm configuration found in global_constraints")
+        return fa_config
+    except Exception as e:
+        logging.warning(f"Failed to load false alarm config: {e}. Using hardcoded defaults.")
+        return {
+            'type_1_unusual_port': {
+                'port_range': {'min': 10000, 'max': 65535},
+                'allowed_services': ['dns', 'http', 'smtp']
+            },
+            'type_2_high_volume': {
+                'bytes_multiplier': {'min': 2, 'max': 5},
+                'allowed_services': ['dns', 'smtp']
+            },
+            'type_3_rare_duration': {
+                'duration_multiplier': {'min': 3, 'max': 10},
+                'allowed_services': ['ssh_admin']
+            }
+        }
+```
+
+**Then refactor** `_generate_type1_unusual_port()`, `_generate_type2_high_volume()`, and `_generate_type3_rare_duration()` functions to read from `fa_config` parameter instead of hardcoding.
+
+#### Step 6: Update Metadata Defaults
+
+**In all generation steps** (step_3.py, step_4.py, step_5.py, step_6.py), replace hardcoded metadata values:
+
+```python
+# Before (hardcoded):
+sttl = 64
+dttl = 64
+sloss = 0
+dloss = 0
+state = 'CON'
+
+# After (from config):
+metadata_defaults = load_metadata_defaults(global_constraints)
+sttl = metadata_defaults['source_ttl']
+dttl = metadata_defaults['destination_ttl']
+sloss = metadata_defaults['source_loss_percent']
+dloss = metadata_defaults['destination_loss_percent']
+state = metadata_defaults['connection_state']
+```
+
+#### Step 7: Update main.py
+
+**Add configuration loading** at initialization (after line 80, where global_constraints is loaded):
+
+```python
+# Load all configuration sections
+try:
+    temporal_arch = helper_functions.load_temporal_architecture(global_constraints)
+    service_defs = helper_functions.load_service_definitions(global_constraints)
+    fa_config = helper_functions.load_false_alarm_config(global_constraints)
+    metadata_defaults = helper_functions.load_metadata_defaults(global_constraints)
+    
+    logging.info(f"Loaded {len(temporal_arch['phases'])} phases from global_constraints")
+    logging.info(f"Loaded {len(service_defs)} service definitions from global_constraints")
+    logging.info(f"Loaded {len(fa_config)} false alarm types from global_constraints")
+except Exception as e:
+    logging.warning(f"Configuration loading encountered issues: {e}. Using defaults.")
+```
+
+**Pass config parameters** to each step (currently only `network_topology` is passed):
+
+```python
+# Current (line 150+):
+step_1_data = step_1.process_templates(...)
+
+# Updated:
+step_1_data = step_1.process_templates(
+    ...,
+    global_constraints=global_constraints,
+    temporal_architecture=temporal_arch,
+    service_definitions=service_defs,
+    false_alarm_config=fa_config,
+    metadata_defaults=metadata_defaults
+)
+```
+
+### Testing Requirements
+
+Create a new test suite `test_config_driven_pipeline.py`:
+
+1. **Test configuration loading**:
+   - All four loader functions return valid dicts with required fields
+   - Fallbacks work when config sections are missing
+   - Validation catches malformed configs
+
+2. **Test phase structure**:
+   - Phases from config match hardcoded defaults
+   - Phase boundaries don't overlap
+   - observation_window is respected
+
+3. **Test service definitions**:
+   - All services have required fields (port, duration, bytes)
+   - Port ranges are valid (1-65535)
+   - Duration/byte ranges make sense (min < max)
+
+4. **Test false alarm configuration**:
+   - All three types present and valid
+   - Port ranges within valid bounds
+   - Multipliers positive
+
+5. **Integration test**:
+   - Run full pipeline with config-loaded values
+   - Output CSVs identical to current hardcoded approach
+   - All 1800-second observation windows respected
+   - Service ports match definitions
+
+### Risk Assessment
+
+| Component | Risk Level | Mitigation |
+|-----------|-----------|-----------|
+| Phase structure | LOW | Fallback logic ensures backward compatibility; test with existing configs |
+| Service definitions | MEDIUM | Validate port/duration/byte ranges; ensure all existing services covered |
+| False alarm thresholds | MEDIUM | Compare Type 1/2/3 distributions before/after; validate via random seed |
+| Metadata defaults | LOW | Simple constant values; easy to verify in output CSV |
+| Integration | LOW | Run existing test suite; compare outputs byte-for-byte with seed validation |
+
+### Effort Estimate
+
+| Task | Time | Difficulty |
+|------|------|-----------|
+| Expand global_constraints.json | 30 min | Easy |
+| Create helper loader functions | 45 min | Easy-Medium |
+| Update step_2.py (temporal) | 45 min | Medium |
+| Update step_4.py (services) | 1 hour | Medium |
+| Update step_5.py (false alarms) | 1.5 hours | Medium-Hard |
+| Metadata defaults propagation | 45 min | Easy |
+| Update main.py parameter passing | 30 min | Easy |
+| Create test suite | 1.5 hours | Medium |
+| Integration testing & fixes | 1 hour | Medium |
+| **TOTAL** | **~7 hours** | **Medium** |
+
+**Recommended Approach**: Implement in this order to minimize risk:
+1. Start with metadata_defaults (lowest risk)
+2. Add temporal_architecture (one function, isolated)
+3. Add service_definitions (larger change but well-scoped)
+4. Add false_alarm_config (most complex, most testing needed)
+5. Full integration testing
