@@ -410,6 +410,50 @@
     ]
   },
   
+  "anomaly_detection_rules": {
+    "description": "Thresholds for detecting network anomalies (behavioral deviations and topology violations). Used by heuristic IDS model for zero-day detection. All triggered anomalies are reported as potential security events; ground truth (malicious vs. benign) is determined during evaluation.",
+    "unusual_port_traffic": {
+      "name": "Unusual Port Traffic",
+      "description": "Ephemeral port used with service that normally uses well-known ports",
+      "detection_mechanism": "High port number (≥10000) with service known to run on well-known ports",
+      "dport_threshold": 10000,
+      "benign_services": ["http", "https", "dns", "ftp", "smtp", "ssh", "rdp", "ssh_admin"],
+      "trusted_hosts": ["Enterprise0", "Enterprise1", "Enterprise2", "Defender"],
+      "confidence": 0.75
+    },
+    "high_volume_traffic": {
+      "name": "High Volume Traffic",
+      "description": "Anomalously large data transfer over protocol normally low-traffic",
+      "detection_mechanism": "Large bytes transfer on DNS or SMTP within single connection",
+      "services": ["dns", "smtp"],
+      "bytes_threshold": 100000,
+      "confidence": 0.70,
+      "realistic_note": "Zone transfers (~250KB in 1-2 seconds) are unusual but legitimate; flagged for investigation"
+    },
+    "rare_duration_traffic": {
+      "name": "Rare Duration Traffic",
+      "description": "Unusual connection patterns for service type, especially from trusted administrative hosts",
+      "detection_mechanism": "SSH connections with unusual byte/duration signatures from trusted sources",
+      "rule_1_very_short": {
+        "duration_threshold": 0.1,
+        "bytes_range": [50, 500]
+      },
+      "rule_2_admin_anomaly": {
+        "source_type": ["Enterprise0", "Enterprise1", "Enterprise2", "Defender"],
+        "duration_threshold": 1.0,
+        "bytes_threshold": 500
+      },
+      "confidence": 0.65,
+      "design_note": "Detects both obviously failed attempts (very short) and suspicious admin behavior (unusual byte/duration combo)"
+    },
+    "validation_notes": {
+      "stateless": "All thresholds are universal; no per-dataset baseline computation",
+      "service_specific": "Detection rules vary by service (SSH, DNS, etc.)",
+      "context_aware": "Considers source host (trusted vs. user) and destination subnet",
+      "application": "Apply these rules to detect anomalies; if triggered, IDS reports as potential security event. Experimenter determines ground truth during evaluation."
+    }
+  },
+
   "unsw_dataset_reference": {
     "original_source": "UNSW-NB15",
     "original_path": "c:\\Users\\groessli\\Documents\\GitHub\\CHART_IDS_Experiment\\IDS_Datasets\\UNSW_NB15_training-set(in).csv",

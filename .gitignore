@@ -1,3 +1,5 @@
 # IDS Datasets - ignore all files in the IDS_Datasets directory
 IDS_Datasets/*
 IDS_tables/*
+IDS_cleaned_tables/*
+IDS_heuristic_model_eval/*
