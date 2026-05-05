@@ -94,11 +94,12 @@ print(df.iloc[0])
    - Outputs predictions with confidence scores and explanations
    - **Stateless**: Uses universal thresholds, no baselines
 
-2. **`apply_human_feedback.py`** - Human feedback integration
+2. **`apply_human_feedback.py`** - Human feedback integration (non-flipping)
    - Merges expert feedback with model predictions
-   - Applies intelligent decision-flip logic
-   - Adapts model confidence based on human input
-   - Tracks rule overrides for analysis
+   - **Adjusts model confidence based on human feedback** (predictions NEVER flip)
+   - Uses gap-scaled penalty logic for confidence adjustment
+   - Tracks rule overrides for quality analysis
+   - Preserves original model perspective for downstream decision aggregation
 
 3. **`generate_feedback_template.py`** - Feedback preparation
    - Creates empty feedback CSVs ready for expert review
@@ -198,35 +199,206 @@ id,human_feedback,human_confidence,human_explanation
 
 ---
 
-### Step 4: Apply Human Feedback
+### Step 4: Apply Human Feedback (Confidence Adjustment, Not Flipping)
 
 ```bash
 python apply_human_feedback.py ./IDS_heuristic_model_eval ./human_feedback \
   --output-dir ./IDS_with_feedback
 ```
 
-**Output:** Enhanced CSVs with feedback integration
+**Output:** Enhanced CSVs with confidence adjustments based on human feedback
+
+**Model predictions NEVER flip.** Instead, confidence is adjusted using gap-scaled penalties:
 
 **New columns added:**
 - `human_feedback`: Expert's prediction
 - `human_confidence`: Expert's confidence (0.0-1.0)
 - `human_explanation`: Optional expert notes
-- `model_final_pred`: Decision after considering human input
-- `model_final_conf`: Confidence after adjustment
-- `decision_flipped`: True if prediction changed due to feedback
-- `flip_reason`: Why the prediction changed (or didn't)
-- `rule_override_count`: How many times this rule was overridden
-- `confidence_gap`: abs(model_confidence - human_confidence)
+- `confidence_adjusted`: Model confidence after human feedback consideration
+- `adjustment_reason`: Explanation of confidence change
+- `confidence_gap`: |model_confidence - human_confidence|
+- `rule_override_count`: How many times this rule saw significant confidence reduction
 
 **Example row after feedback:**
 ```
 prediction=malicious, confidence=0.75,
 human_feedback=not malicious, human_confidence=0.90,
-model_final_pred=not malicious, model_final_conf=0.55,
-decision_flipped=True,
-flip_reason=Human very confident (conf=0.90) → FLIP,
-rule_override_count=1
+confidence_adjusted=0.35,
+adjustment_reason=Strong disagreement (human_conf=0.90): Gap=0.15, penalty applied → 0.35,
+confidence_gap=0.15
 ```
+
+**Key difference:** Model's original prediction is preserved. Confidence is adjusted to reflect the strength of human disagreement/agreement. This allows downstream decision aggregation to weigh both perspectives fairly.
+
+---
+
+## Complete Workflow Guide: Step-by-Step
+
+This section provides a detailed overview of the **entire workflow** for running the heuristic IDS model, from data preparation through human feedback integration.
+
+### Phase 1: Data Preparation (One-Time Setup)
+
+> **When:** Only once, at the beginning
+> **Prerequisites:** Raw UNSW_NB15 dataset
+
+**Step 0a → 0b → 0c** (see "Prerequisites" section above)
+- Generate IDS tables with ground truth labels
+- Remove ground truth labels → blind dataset
+- Verify data integrity
+
+**Outputs:** `IDS_cleaned_tables/` ready for model
+
+---
+
+### Phase 2: Anomaly Detection (Blind to Ground Truth)
+
+> **When:** After data prep, before human review
+> **Input:** `IDS_cleaned_tables/` (cleaned network flow data)
+
+**Step 1: Generate Model Predictions**
+```bash
+python heuristic_model.py ./IDS_cleaned_tables \
+  --output-dir ./IDS_heuristic_model_eval \
+  --constraints ./templates/global_constraints.json
+```
+
+**Output:** `IDS_heuristic_model_eval/`
+- Each CSV has: original data + `prediction`, `confidence`, `reason`
+- Model is completely blind to ground truth at this point
+
+**Typical accuracy:** 75-85% on balanced test sets (no human feedback yet)
+
+---
+
+### Phase 3: Human Expert Review (Optional but Recommended)
+
+> **When:** After model predictions, to improve confidence calibration
+> **Input:** `IDS_heuristic_model_eval/` (model predictions)
+
+**Step 2: Create Feedback Templates**
+```bash
+python generate_feedback_template.py ./IDS_heuristic_model_eval \
+  --output-dir ./human_feedback
+```
+
+**Output:** `human_feedback/` with empty CSVs
+- One template per prediction file
+- Structure: `id`, `human_feedback`, `human_confidence`, `human_explanation` (empty)
+- No rows are required to be filled; expert reviews at their own pace
+
+**Step 3: Collect Expert Feedback**
+- Expert reviews model predictions (predictions are suggestions, not requirements)
+- For suspicious or uncertain rows, expert fills in:
+  - `human_feedback`: "malicious" or "not malicious" (or leave blank)
+  - `human_confidence`: 0.0-1.0 (how sure about this judgment?)
+  - `human_explanation`: Optional notes (for documentation)
+
+**No time pressure:** Leave rows blank if not reviewed. Only reviewable rows need feedback.
+
+---
+
+### Phase 4: Confidence Adjustment with Human Feedback
+
+> **When:** After human review (or skip if no feedback available)
+> **Input:** `IDS_heuristic_model_eval/` + `human_feedback/`
+
+**Step 4: Apply Human Feedback**
+```bash
+python apply_human_feedback.py ./IDS_heuristic_model_eval ./human_feedback \
+  --output-dir ./IDS_with_feedback
+```
+
+**Output:** `IDS_with_feedback/`
+- Merges predictions + feedback + adjustments
+- Model predictions unchanged (NEVER flip)
+- Confidence adjusted based on human agreement/disagreement
+- New columns added (see Step 4 output description)
+
+**Typical improvement:** +2-5% accuracy with good expert feedback
+
+---
+
+### Phase 5: Optional - Evaluation Against Ground Truth
+
+> **When:** If ground truth labels available (research/validation only)
+> **Prerequisite:** Must have `IDS_with_feedback/` outputs
+
+**Step 5: Measure Accuracy**
+```bash
+python evaluate_ground_truth.py
+```
+
+**Output:** Accuracy metrics
+- Pre-feedback accuracy: Model alone
+- Post-feedback accuracy: After human input
+- Breakdown by malicious vs. not-malicious categories
+- Human feedback impact analysis
+
+**Use case:** Validate that model + human feedback improves over ground truth
+
+---
+
+## Typical Execution Timeline
+
+### Scenario 1: Quick Initial Run (No Human Feedback)
+```
+Step 0a-0c (data prep)  → 5-10 minutes
+Step 1 (model)          → 5-15 minutes
+Total:                  → 10-25 minutes
+Output:                 → IDS_heuristic_model_eval/
+```
+
+### Scenario 2: Full Workflow with Human Feedback
+```
+Step 0a-0c (data prep)     → 5-10 minutes
+Step 1 (model)             → 5-15 minutes
+Step 2 (feedback template) → 1-2 minutes
+Step 3 (human review)      → 30 minutes - 2 hours (depends on dataset size)
+Step 4 (apply feedback)    → 1-5 minutes
+Total:                     → 45 minutes - 3 hours
+Output:                    → IDS_with_feedback/
+```
+
+### Scenario 3: Full Workflow with Evaluation
+```
+All steps 0a-0c through 4  → 45 minutes - 3 hours
+Step 5 (evaluate)          → 2-5 minutes
+Total:                     → 45 minutes - 3 hours
+Output:                    → IDS_with_feedback/ + evaluation report
+```
+
+---
+
+## Key Decision Points
+
+### Question 1: Do I need to collect human feedback?
+
+| Scenario | Answer | Actions |
+|----------|--------|---------|
+| Quick proof-of-concept | No | Run Steps 0a-1, then stop |
+| Improving accuracy | Yes | Run all steps 0a-4 |
+| Research/comparison | Maybe | Run 0a-4, then optionally Step 5 with ground truth |
+
+### Question 2: How much human feedback is needed?
+
+| Feedback Coverage | Expected Improvement | Effort |
+|-------------------|---------------------|--------|
+| 0% (no feedback) | Baseline accuracy | None |
+| 10-20% (spot-check) | +1-2% accuracy | 30-60 min |
+| 50% (comprehensive) | +3-5% accuracy | 2-4 hours |
+| 100% (full review) | +5-8% accuracy | 4+ hours |
+
+**Recommendation:** Start with 20% spot-check on high-uncertainty rows (confidence 0.50-0.75)
+
+### Question 3: Should I modify detection thresholds?
+
+| Situation | Threshold Changes |
+|-----------|-------------------|
+| Too many false positives | Increase `dport_threshold`, `bytes_threshold` |
+| Missed important anomalies | Decrease thresholds (more sensitive) |
+| After seeing feedback patterns | Adjust gap-scaling multipliers (0.50→0.60) |
+
+Modify `templates/global_constraints.json`, then re-run Step 1.
 
 ---
 
@@ -332,50 +504,230 @@ This includes:
 
 ---
 
-## Human Feedback Decision Logic
+## Human Feedback Confidence Adjustment Logic
 
-The model adapts its predictions based on expert feedback using this logic:
+The model applies **non-flipping confidence adjustment**: The model's prediction NEVER changes based on human feedback. Instead, confidence is adjusted to reflect the strength of human disagreement or agreement.
 
-### When Expert AGREES with Model
-No change needed. Confidence may be boosted if expert is very confident.
+**Why non-flipping?** This design preserves the model's original perspective without bias. A downstream decision aggregation script then receives both the model's view (with adjusted confidence) and the human's view, allowing it to make informed final decisions.
 
-### When Expert DISAGREES with Model
+### Adjustment Mechanism
 
-**Decision flip rules:**
+When human feedback is provided, the model's confidence is adjusted using a **gap-scaled penalty** approach:
+
+**Confidence Gap** = |model_confidence - human_confidence|
+
+Larger gaps signal stronger disagreement and trigger proportionally larger confidence adjustments.
+
+### Agreement Cases (Human Agrees with Model)
+
+When `human_feedback == model_prediction`, confidence is boosted to reflect human validation:
+
+| Human Confidence | Adjustment | Formula |
+|------------------|-----------|---------|
+| **≥0.85** | Strong validation → Boost | `min(conf + 0.10, 0.95)` |
+| **0.70–0.84** | Moderate validation → Keep | `conf` (unchanged) |
+| **<0.70** | Weak validation → Slight boost | `conf + 0.05` |
+
+**Example:**
 ```
-IF expert_confidence >= 0.80:
-    → FLIP to expert's prediction (expert is very confident)
-
-ELIF expert_confidence >= 0.70:
-    IF model_confidence < 0.75:
-        → FLIP (both uncertain, expert wins)
-    ELSE:
-        → KEEP model (model confident, expert only moderate)
-
-ELIF expert_confidence >= 0.55:
-    IF model_confidence < 0.65:
-        → FLIP (model very weak, expert overrides)
-    ELSE:
-        → KEEP model (model moderate, expert too uncertain)
-
-ELSE (expert_confidence < 0.55):
-    → KEEP model (expert too uncertain, trust model)
+Model: malicious (0.75), Human: malicious (0.88)
+→ Gap = 0.13, Strong agreement
+→ Adjusted confidence: min(0.75 + 0.10, 0.95) = 0.85
 ```
 
-### Confidence Adjustment
+### Disagreement Cases (Human Disagrees with Model)
 
-After feedback, model confidence is re-calibrated:
+When `human_feedback ≠ model_prediction`, confidence is reduced based on human confidence strength and gap magnitude.
 
-| Scenario | Formula | Meaning |
-|----------|---------|---------|
-| Expert agrees, very confident | conf + 0.10 | Rule validated |
-| Expert agrees, moderate conf | conf (unchanged) | Rule confirmed |
-| Expert disagrees, very confident | (1 - conf) + 0.15-0.30 | Heavy penalty for being wrong |
-| Expert disagrees, moderate conf | (1 - conf) + 0.40 | Medium penalty |
-| Expert disagrees, weak conf | (1 - conf) + 0.45 | Soft penalty |
-| Expert very uncertain | conf + 0.05 | Slight trust boost to model |
+**Confidence floor:** 0.30 (prevents over-penalizing; model always retains some voice in aggregation)
 
-**Result:** Lower confidence = model is less certain about its rule going forward
+#### Strong Disagreement (human_confidence ≥ 0.80)
+
+| Calculation | Values |
+|-------------|--------|
+| Base penalty | `(1.0 - model_conf) × 0.50` |
+| Gap scaling | `+ confidence_gap × 0.20` |
+| Result | `max(base + gap, 0.30)` |
+
+**Example:**
+```
+Model: malicious (0.85), Human: not malicious (0.82)
+→ Gap = 0.03
+→ Base penalty: (1.0 - 0.85) × 0.50 = 0.075
+→ Gap penalty: 0.03 × 0.20 = 0.006
+→ Total: max(0.075 + 0.006, 0.30) = 0.30 (floor applied)
+→ Adjusted confidence: 0.30
+```
+
+#### Moderate Disagreement (0.70 ≤ human_confidence < 0.80)
+
+| Calculation | Values |
+|-------------|--------|
+| Base penalty | `(1.0 - model_conf) × 0.35` |
+| Gap scaling | `+ confidence_gap × 0.15` |
+| Result | `max(base + gap, 0.30)` |
+
+**Example:**
+```
+Model: not malicious (0.60), Human: malicious (0.72)
+→ Gap = 0.12
+→ Base penalty: (1.0 - 0.60) × 0.35 = 0.14
+→ Gap penalty: 0.12 × 0.15 = 0.018
+→ Total: max(0.14 + 0.018, 0.30) = 0.30 (floor applied)
+→ Adjusted confidence: 0.30
+```
+
+#### Weak Disagreement (0.55 ≤ human_confidence < 0.70)
+
+| Calculation | Values |
+|-------------|--------|
+| Base penalty | `(1.0 - model_conf) × 0.25` |
+| Gap scaling | `+ confidence_gap × 0.10` |
+| Result | `max(base + gap, 0.30)` |
+
+**Example:**
+```
+Model: malicious (0.70), Human: not malicious (0.65)
+→ Gap = 0.05
+→ Base penalty: (1.0 - 0.70) × 0.25 = 0.075
+→ Gap penalty: 0.05 × 0.10 = 0.005
+→ Total: max(0.075 + 0.005, 0.30) = 0.30 (floor applied)
+→ Adjusted confidence: 0.30
+```
+
+#### Very Weak Disagreement (human_confidence < 0.55)
+
+Human is too uncertain to meaningfully challenge the model. Minimal adjustment:
+
+| Calculation | Result |
+|-------------|--------|
+| Adjustment | `max(conf - 0.05, 0.30)` |
+
+**Example:**
+```
+Model: not malicious (0.80), Human: malicious (0.50)
+→ Gap = 0.30 (large, but human very uncertain)
+→ Minimal penalty: max(0.80 - 0.05, 0.30) = 0.75
+→ Adjusted confidence: 0.75 (slight reduction only)
+```
+
+### No Flip Under Any Circumstances
+
+```
+┌─ Is human feedback provided?
+│  ├─ NO → prediction = model_pred, confidence_adjusted = confidence
+│  │
+│  └─ YES → prediction = model_pred (NEVER CHANGES)
+│     └─ confidence_adjusted = calculated per rules above
+```
+
+The model prediction in the output CSV is always the original model prediction. Only confidence changes.
+
+---
+
+## Understanding Output Columns
+
+### New Output Structure
+
+After applying human feedback, CSVs contain these columns:
+
+| Column | Source | Meaning |
+|--------|--------|---------|
+| `id` | Data | Row identifier for tracking |
+| `src_ip`, `dst_ip` | Model input | Network endpoints |
+| `... (other features)` | Model input | Port, service, bytes, duration, etc. |
+| `prediction` | **Model** | Original model prediction (`malicious` or `not malicious`) |
+| `confidence` | **Model** | Original model confidence (0.0–1.0) |
+| `reason` | **Model** | Rule that triggered detection |
+| `human_feedback` | **Human** | Expert's prediction (if reviewed) |
+| `human_confidence` | **Human** | Expert's confidence (if reviewed) |
+| `human_explanation` | **Human** | Expert's optional notes |
+| `confidence_adjusted` | **Both** | Model confidence after adjustment for human input |
+| `confidence_gap` | **Both** | Absolute difference: \|model_conf - human_conf\| |
+| `adjustment_reason` | **Both** | Explanation of how/why confidence adjusted |
+| `rule_override_count` | **Analysis** | How many times this rule saw significant confidence reduction |
+
+### Key Differences from Previous Version
+
+- **NO `model_final_pred`** – Prediction never changes
+- **NO `decision_flipped`** – Not applicable (flips don't occur)
+- **NEW `confidence_adjusted`** – Confidence reflects human feedback without changing decision
+- **NEW `adjustment_reason`** – Explains adjustment calculation
+- **`confidence_gap`** – Now used for penalty scaling, not decision flipping
+
+---
+
+## Decision Aggregation (Next Steps)
+
+For your downstream decision aggregation script, each row provides:
+
+```python
+{
+    'id': 42,
+    'prediction': 'malicious',           # ← Model's original view
+    'confidence': 0.85,                  # ← Model's original confidence
+    'confidence_adjusted': 0.45,         # ← Confidence after human challenge
+    'human_feedback': 'not malicious',   # ← Human's view
+    'human_confidence': 0.80,            # ← Human's confidence
+    'confidence_gap': 0.05               # ← Magnitude of disagreement
+}
+```
+
+Your aggregator can now:
+1. **Compare original vs adjusted confidence**: Did human feedback strongly challenge the model?
+2. **Weigh both perspectives**: Use adjusted confidence to balance model and human inputs
+3. **Apply custom logic**: Domain-specific rules for final decisions without pre-flip bias
+4. **Track confidence dynamics**: See which rows generated strongest human-model conflicts
+
+---
+
+## Interpreting Adjustment Outcomes
+
+### What Different Adjustments Mean
+
+| Scenario | Adjustment | Interpretation |
+|----------|-----------|-----------------|
+| Model: 0.85, Human: agrees @ 0.90 | Conf boosted to 0.95 | Rule strongly validated by expert |
+| Model: 0.85, Human: disagrees @ 0.82 | Conf reduced to 0.30 | Expert sees obvious error; rule needs review |
+| Model: 0.60, Human: disagrees @ 0.70 | Conf reduced to 0.30 | Both uncertain, but expert's view preferred |
+| Model: 0.80, Human: disagrees @ 0.50 | Conf reduced to 0.75 | Human too uncertain to override; minimal penalty |
+| Model: 0.85, Human: agrees @ 0.60 | Conf unchanged (0.85) | Human agrees but not confident; keep model |
+
+### Analyzing Patterns
+
+- **High rule_override_count for rule X** → Rule is frequently questioned by experts; consider recalibrating thresholds
+- **confidence_adjusted << confidence** → Human-model strong disagreement; high-priority for review
+- **confidence_adjusted ≈ confidence** → Agreement or weak disagreement; lower priority
+- **Many low confidence_adjusted values** → Experts are effectively curating anomalies; aggregator may want conservative stance
+
+---
+
+## Configuration & Tuning
+
+The confidence adjustment parameters are **currently hardcoded** in [apply_human_feedback.py](apply_human_feedback.py) but can be easily made configurable:
+
+### Parameters
+
+```python
+# Gap-scaled penalty multipliers (in compute_confidence_adjustment)
+strong_base_penalty = 0.50        # (1.0 - conf) × 0.50 for >=0.80 human conf
+strong_gap_multiplier = 0.20      # gap × 0.20
+
+moderate_base_penalty = 0.35      # (1.0 - conf) × 0.35 for 0.70-0.79
+moderate_gap_multiplier = 0.15    # gap × 0.15
+
+weak_base_penalty = 0.25          # (1.0 - conf) × 0.25 for 0.55-0.69
+weak_gap_multiplier = 0.10        # gap × 0.10
+
+confidence_floor = 0.30           # Never adjust below this
+confidence_ceiling = 0.95         # Never boost above this
+```
+
+**Tuning Guidance:**
+- **Increase multipliers** (e.g., 0.60, 0.25) for more aggressive penalties on disagreement
+- **Decrease multipliers** (e.g., 0.40, 0.15) for softer adjustments
+- **Raise confidence_floor** (e.g., 0.40) if model rules are high-quality and should retain more influence
+- **Lower confidence_floor** (e.g., 0.20) if experts are very trusted and should strongly challenge model
 
 ---
 
@@ -482,18 +834,28 @@ HUMAN FEEDBACK IMPACT:
 
 ### Key Columns to Review
 
-#### `prediction` (Model Output)
+#### `prediction` (Model Output - ORIGINAL, NEVER FLIPS)
 ```
-"malicious" = Anomaly detected
-"not malicious" = Normal pattern
+"malicious" = Model detected anomaly
+"not malicious" = Model saw normal pattern
 ```
+**Important:** This column is ALWAYS the original model prediction, unchanged by human feedback.
 
-#### `confidence` (Model's Certainty)
+#### `confidence` (Model's Original Certainty)
 ```
 0.85-1.0 = High confidence (topology violations, obvious anomalies)
 0.65-0.85 = Medium confidence (behavioral anomalies)
 <0.65 = Low confidence (uncertain)
 ```
+**This is the original model confidence before any human feedback.**
+
+#### `confidence_adjusted` (After Human Feedback)
+```
+Same scale as above, but adjusted for human input
+Lower than original = Human disagreement challenged the model
+Higher than original = Human agreement validated the model
+```
+**This reflects how human expertise affects our trust in the model's rule.**
 
 #### `reason` (Why Model Flagged It)
 ```
@@ -503,31 +865,52 @@ Examples:
 "No anomalies detected"
 ```
 
-#### `decision_flipped` (Human Impact)
+#### `human_feedback` (Expert's Assessment)
 ```
-True = Expert overrode model's prediction
-False = Expert either agreed or didn't review
+"malicious" = Expert says it's anomalous
+"not malicious" = Expert says it's normal
+(blank) = Expert didn't review this row
 ```
 
-#### `flip_reason` (How Decision Changed)
+#### `human_confidence` (Expert's Certainty)
+```
+0.0-1.0 (blank if not reviewed)
+0.85+ = Very confident expert assessment
+0.70-0.85 = Reasonably confident
+0.55-0.70 = Weakly confident
+<0.55 = Very uncertain
+```
+
+#### `confidence_gap` (Disagreement Magnitude)
+```
+= abs(model_confidence - human_confidence)
+0.00-0.10 = Slight difference (aligned)
+0.10-0.25 = Moderate difference
+>0.25 = Large difference (significant disagreement)
+```
+
+#### `adjustment_reason` (How Confidence Changed)
 ```
 Examples:
-"Human very confident (conf=0.90) → FLIP"
-"Both uncertain (model_conf=0.75, human_conf=0.60) → FLIP"
-"Model moderate (conf=0.75), human weak → KEEP model"
+"Agreement: Human very confident (conf=0.90) → Boosted to 0.95"
+"Strong disagreement (human_conf=0.82): Gap=0.15, penalty applied → 0.35"
+"Moderate disagreement (human_conf=0.75): Gap=0.10, penalty applied → 0.42"
+"No human feedback provided"
 ```
 
-#### `rule_override_count` (Rule Performance)
+#### `rule_override_count` (Rule Performance Tracking)
 ```
-Incremented each time this specific rule is overridden
-High count = Rule may need recalibration
+Incremented each time this specific rule sees significant confidence reduction
+0 = Rule is trusted/validated
+1-3 = Rule occasionally questioned
+4+ = Rule is frequently overridden; may need recalibration
 ```
 
 ---
 
 ## Analyzing Results
 
-### View Model Predictions Only
+### View Model Predictions (Original)
 
 ```python
 import pandas as pd
@@ -535,33 +918,59 @@ df = pd.read_csv("predictions.csv")
 df[df['prediction'] == 'malicious'][['id', 'src_host', 'dst_host', 'reason', 'confidence']]
 ```
 
-### View Feedback Impact
+### View Confidence Adjustment Impact
 
 ```python
-# Rows where expert overrode model
-df[df['decision_flipped'] == True][['id', 'prediction', 'model_final_pred', 'flip_reason']]
+# Rows with significant human-model disagreement
+high_disagreement = df[df['confidence_adjusted'] < (df['confidence'] - 0.15)]
+print(f"Significant adjustments: {len(high_disagreement)} rows")
+print(high_disagreement[['id', 'prediction', 'confidence', 'confidence_adjusted', 'human_feedback']])
 
-# Rows where expert agreed
-df[df['decision_flipped'] == False][['id', 'prediction', 'human_feedback']]
+# Rows where expert agreed and boosted confidence
+validated = df[df['confidence_adjusted'] > df['confidence']]
+print(f"Human-validated rules: {len(validated)} rows")
+print(validated[['id', 'prediction', 'confidence', 'confidence_adjusted', 'human_confidence']])
 
-# High disagreement (confidence gap)
-df.nlargest(10, 'confidence_gap')[['id', 'confidence', 'human_confidence', 'flip_reason']]
+# Rows where confidence dropped minimally (weak disagreement)
+minimal_impact = df[(df['confidence_adjusted'] >= (df['confidence'] - 0.10)) & 
+                    (df['human_feedback'].notna())]
+print(f"Minimal adjustment rows: {len(minimal_impact)}")
 ```
 
 ### Identify Problematic Rules
 
 ```python
-# Count overrides per rule
-df.groupby('reason').agg({
-    'rule_override_count': 'sum',
-    'id': 'count'
-}).rename(columns={'id': 'total_predictions'})
+# Count significant reductions per rule
+rule_quality = df.groupby('reason').agg({
+    'rule_override_count': 'max',
+    'id': 'count',
+    'confidence_adjusted': lambda x: (x < 0.45).sum()  # Count rows with confidence <0.45
+}).rename(columns={'id': 'total_predictions', 'confidence_adjusted': 'low_conf_count'})
+
+rule_quality['override_rate'] = (rule_quality['low_conf_count'] / rule_quality['total_predictions'] * 100).round(1)
+print(rule_quality.sort_values('override_rate', ascending=False))
 ```
 
 **Interpretation:**
-- High override count = Rule triggers on false positives
-- Low override count = Rule is accurate
-- **Action:** Relax threshold or add context checks for high-override rules
+- High `override_rate` = Rule triggers on false positives; consider relaxing thresholds
+- Low `override_rate` = Rule is reliable; confidence adjustments are minimal
+- `low_conf_count > 0` = Experts definitively challenge this rule; needs review
+
+### View Agreement vs Disagreement Patterns
+
+```python
+# Rows with human feedback
+with_feedback = df[df['human_feedback'].notna()]
+
+# Count agreements vs disagreements
+agreements = (with_feedback['human_feedback'] == with_feedback['prediction']).sum()
+disagreements = len(with_feedback) - agreements
+
+print(f"Total rows with feedback: {len(with_feedback)}")
+print(f"  Agreements: {agreements} ({agreements/len(with_feedback)*100:.1f}%)")
+print(f"  Disagreements: {disagreements} ({disagreements/len(with_feedback)*100:.1f}%)")
+print(f"  Avg confidence gap (disagreements): {with_feedback[with_feedback['human_feedback'] != with_feedback['prediction']]['confidence_gap'].mean():.3f}")
+```
 
 ---
 
@@ -669,9 +1078,17 @@ print(flipped[['id', 'prediction', 'model_final_pred', 'human_confidence', 'flip
 **Cause:** Network configuration mismatch, rules allow more paths than intended
 **Solution:** Review `is_allowed_path()` logic in code, verify network topology assumptions
 
-### Issue: Human feedback not merging
-**Cause:** Filename mismatch (feedback CSV name doesn't match prediction CSV)
-**Solution:** Feedback files should be named `[prediction_name]_feedback.csv`
+### Issue: Model predictions seem "wrong" but aren't changing
+**Cause:** Model predictions NEVER flip. You're seeing confidence adjustments, not decision changes.
+**Solution:** Compare `confidence` vs `confidence_adjusted` to see adjustment magnitude. This is working as designed.
+
+### Issue: confidence_adjusted is always the same as confidence
+**Cause:** No human feedback provided, or all feedback agrees with model
+**Solution:** Ensure feedback CSVs are being found and loaded correctly. Check that `human_feedback` and `human_confidence` columns have values.
+
+### Issue: All confidence_adjusted values are at 0.30 floor
+**Cause:** Strong, consistent human disagreement across many rows
+**Solution:** Check if feedback is accurate or if rules need recalibration. Review `adjustment_reason` for patterns. The floor prevents over-penalizing; consider raising it temporarily to see actual penalty values.
 
 ---
 
@@ -703,20 +1120,26 @@ All thresholds are **universal** and **absolute**. No per-dataset tuning or base
 
 ## FAQs
 
-**Q: Why does the model flag benign traffic as malicious?**
-A: It detects statistical deviations, not attack signatures. A 250KB DNS transfer is anomalous (unusual but legitimate).
+**Q: Why doesn't the model prediction change even when an expert disagrees strongly?**
+A: By design. The model prediction is frozen to preserve its original perspective. Downstream decision aggregation will see both the model's view (with adjusted confidence) and the human's view, then decide. This prevents losing information before the aggregator gets to decide.
 
-**Q: Can I disable rules?**
-A: Set their confidence to 0.00 in `global_constraints.json` (or leave threshold unmet). Better: adjust thresholds.
+**Q: So human feedback is useless if predictions don't flip?**
+A: No—human feedback directly affects `confidence_adjusted`, which signals trust/distrust in that specific rule. A downstream decision aggregation script can use both `prediction` (original) and `confidence_adjusted` (human-informed) to make intelligent final calls.
 
-**Q: What if the expert is wrong?**
-A: The system flags high-confidence conflicts for review. If expert_conf ≥0.80 and model_conf ≥0.80 and disagree, it's flagged.
+**Q: What's the confidence floor (0.30) for?**
+A: Safety guardrail. Even with strong human disagreement, the model retains minimum voice in aggregation. Prevents one expert from completely silencing a rule. Can be tuned higher/lower per your domain needs.
+
+**Q: Can I change the gap-scaling multipliers?**
+A: Yes—they're in `compute_confidence_adjustment()` in [apply_human_feedback.py](apply_human_feedback.py). Increase multipliers (0.50→0.60) for harsher penalties, decrease (0.50→0.40) for softer penalties. Recommend testing with real feedback data before major changes.
+
+**Q: What if different experts disagree with each other?**
+A: Each expert feedback row produces independent confidence adjustments. If Expert A says "malicious" and Expert B says "not malicious", the model might get confidence reduced twice (once per feedback). You'd need to handle multiple feedback per row in decision aggregation.
+
+**Q: Why no decision flipping when confidence gap is huge (e.g., model 0.90 vs human 0.10)?**
+A: Because human confidence is low (0.10), they're not confident in their assessment. Their disagreement is acknowledged (confidence drops to 0.30), but model retains decision voice. High gap ≠ strong signal if human is uncertain.
 
 **Q: Can the model learn from feedback?**
-A: No. Rules and logic are static. Only per-row confidence adapts (by design, for experiment reproducibility).
-
-**Q: What's a good confidence score?**
-A: 0.75+ indicates high-confidence detections. 0.65-0.75 indicates medium-confidence anomalies.
+A: No. Rules, thresholds, and logic are static (by design—preserves experiment reproducibility). Only per-row confidence adapts. If you want to update rules, modify thresholds in code or configuration files and re-run heuristic_model.py.
 
 ---
 

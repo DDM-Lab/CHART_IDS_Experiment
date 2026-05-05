@@ -36,18 +36,19 @@ class HumanFeedbackIntegrator:
         self.feedback_stats = {
             'total_rows': 0,
             'with_feedback': 0,
-            'decisions_flipped': 0,
             'agreements': 0,
             'disagreements': 0
         }
     
-    def compute_model_final_pred(self, model_pred, model_conf, human_feedback, human_conf):
+    def compute_confidence_adjustment(self, model_pred, model_conf, human_feedback, human_conf):
         """
-        Decide if model should flip its prediction based on human feedback.
+        Compute adjusted confidence based on human feedback.
+        Model prediction NEVER flips; confidence adjusts to reflect agreement/disagreement.
         
-        Decision flip logic:
-        - If human agrees: no flip
-        - If human disagrees: flip depends on human_conf vs model_conf
+        Gap-scaled penalty approach:
+        - Agreement: Boost confidence based on human's agreement strength
+        - Disagreement: Reduce confidence based on human's confidence level and gap magnitude
+        - Gap = abs(model_conf - human_conf); larger gaps = stronger penalty signal
         
         Args:
             model_pred: "malicious" or "not malicious"
@@ -56,110 +57,76 @@ class HumanFeedbackIntegrator:
             human_conf: float [0.0-1.0] (or NaN if no feedback)
         
         Returns:
-            tuple: (final_pred, flipped, flip_reason)
+            tuple: (adjusted_confidence, adjustment_reason)
         """
         # No human feedback provided
         if pd.isna(human_feedback) or pd.isna(human_conf):
-            return model_pred, False, "No human feedback provided"
+            return model_conf, "No human feedback provided"
+        
+        confidence_gap = abs(model_conf - human_conf)
         
         # Human agrees with model
         if human_feedback == model_pred:
             self.feedback_stats['agreements'] += 1
-            return model_pred, False, f"Human agrees (conf={human_conf:.2f})"
+            
+            # Boost confidence based on agreement strength
+            if human_conf >= 0.85:
+                adjusted = min(model_conf + 0.10, 0.95)
+                return adjusted, f"Agreement: Human very confident (conf={human_conf:.2f}) → Boosted to {adjusted:.2f}"
+            elif human_conf >= 0.70:
+                # Keep unchanged
+                return model_conf, f"Agreement: Human moderately confident (conf={human_conf:.2f}) → Unchanged"
+            else:
+                # Slight boost for weak agreement
+                adjusted = model_conf + 0.05
+                return adjusted, f"Agreement: Human weakly confident (conf={human_conf:.2f}) → Slight boost to {adjusted:.2f}"
         
-        # Human disagrees - apply flip logic
+        # Human disagrees - apply gap-scaled penalty
         self.feedback_stats['disagreements'] += 1
         
+        # Confidence floor to prevent over-penalizing
+        confidence_floor = 0.30
+        
         if human_conf >= 0.80:
-            # Human very confident → FLIP to human's feedback
-            self.feedback_stats['decisions_flipped'] += 1
-            return human_feedback, True, f"Human very confident (conf={human_conf:.2f}) → FLIP"
+            # Strong disagreement: Base penalty inverted + gap scaling
+            base_penalty = (1.0 - model_conf) * 0.50
+            gap_penalty = confidence_gap * 0.20
+            adjusted = max(base_penalty + gap_penalty, confidence_floor)
+            return adjusted, f"Strong disagreement (human_conf={human_conf:.2f}): Gap={confidence_gap:.2f}, penalty applied → {adjusted:.2f}"
         
         elif human_conf >= 0.70:
-            # Human moderately confident
-            if model_conf < 0.75:
-                # Model was also uncertain → FLIP
-                self.feedback_stats['decisions_flipped'] += 1
-                return human_feedback, True, f"Both uncertain (model_conf={model_conf:.2f}, human_conf={human_conf:.2f}) → FLIP"
-            else:
-                # Model was confident → Keep original
-                return model_pred, False, f"Model confident (conf={model_conf:.2f}), human moderate → KEEP model"
+            # Moderate disagreement
+            base_penalty = (1.0 - model_conf) * 0.35
+            gap_penalty = confidence_gap * 0.15
+            adjusted = max(base_penalty + gap_penalty, confidence_floor)
+            return adjusted, f"Moderate disagreement (human_conf={human_conf:.2f}): Gap={confidence_gap:.2f}, penalty applied → {adjusted:.2f}"
         
         elif human_conf >= 0.55:
-            # Human weakly confident
-            if model_conf < 0.65:
-                # Model very uncertain → FLIP
-                self.feedback_stats['decisions_flipped'] += 1
-                return human_feedback, True, f"Model very weak (conf={model_conf:.2f}), human weak → FLIP"
-            else:
-                # Model reasonably confident → Keep original
-                return model_pred, False, f"Model moderate (conf={model_conf:.2f}), human weak → KEEP model"
+            # Weak disagreement
+            base_penalty = (1.0 - model_conf) * 0.25
+            gap_penalty = confidence_gap * 0.10
+            adjusted = max(base_penalty + gap_penalty, confidence_floor)
+            return adjusted, f"Weak disagreement (human_conf={human_conf:.2f}): Gap={confidence_gap:.2f}, penalty applied → {adjusted:.2f}"
         
         else:  # human_conf < 0.55
-            # Human very uncertain → NEVER flip, trust model
-            return model_pred, False, f"Human very uncertain (conf={human_conf:.2f}) → TRUST model"
-    
-    def compute_final_confidence(self, model_conf, model_pred, human_conf, human_feedback, decision_flipped):
-        """
-        Compute final confidence after human feedback.
-        
-        Args:
-            model_conf: Original model confidence
-            model_pred: Original model prediction
-            human_conf: Human's confidence
-            human_feedback: Human's feedback
-            decision_flipped: Whether decision was flipped
-        
-        Returns:
-            float: Final model confidence
-        """
-        # Agreement cases
-        if human_feedback == model_pred:
-            if human_conf >= 0.85:
-                # Human strongly validates - boost slightly
-                return min(model_conf + 0.10, 0.95)
-            elif human_conf >= 0.70:
-                # Human agrees moderately - keep
-                return model_conf
-            else:
-                # Human agrees weakly - slight boost
-                return model_conf + 0.05
-        
-        # Disagreement cases
-        if human_conf >= 0.85:
-            # Human strong override - heavy penalty to model
-            if model_conf < 0.70:
-                return 0.40
-            elif model_conf < 0.80:
-                return (1.0 - model_conf) + 0.30
-            else:
-                return (1.0 - model_conf) + 0.15
-        
-        elif human_conf >= 0.70:
-            # Human moderate override
-            if model_conf < 0.70:
-                return 0.50
-            else:
-                return (1.0 - model_conf) + 0.40
-        
-        elif human_conf >= 0.55:
-            # Human weak override
-            return (1.0 - model_conf) + 0.45
-        
-        else:
-            # Human very uncertain - boost model
-            return min(model_conf + 0.05, 0.80)
+            # Very weak disagreement: Minimal penalty, mostly trust model
+            adjusted = max(model_conf - 0.05, confidence_floor)
+            return adjusted, f"Very weak disagreement (human_conf={human_conf:.2f}): Minimal adjustment → {adjusted:.2f}"
+
     
     def integrate_feedback(self, pred_df, feedback_df):
         """
-        Merge model predictions with human feedback and compute adaptations.
+        Merge model predictions with human feedback and adjust confidence.
+        
+        Model prediction NEVER flips. Confidence adjusts based on agreement/disagreement
+        to reflect human feedback strength without losing the model's original perspective.
         
         Args:
             pred_df: DataFrame with model predictions
             feedback_df: DataFrame with human feedback (id, human_feedback, human_confidence, human_explanation)
         
         Returns:
-            DataFrame: Merged with new columns
+            DataFrame: Merged with confidence_adjusted and adjustment_reason columns
         """
         # Merge on id
         result_df = pred_df.copy()
@@ -169,12 +136,10 @@ class HumanFeedbackIntegrator:
             result_df['human_feedback'] = None
             result_df['human_confidence'] = None
             result_df['human_explanation'] = None
-            result_df['model_final_pred'] = result_df['prediction']
-            result_df['model_final_conf'] = result_df['confidence']
-            result_df['decision_flipped'] = False
-            result_df['flip_reason'] = "No human feedback"
-            result_df['rule_override_count'] = 0
+            result_df['confidence_adjusted'] = result_df['confidence']
             result_df['confidence_gap'] = 0.0
+            result_df['adjustment_reason'] = "No human feedback provided"
+            result_df['rule_override_count'] = 0
             return result_df
         
         # Clean feedback: convert empty strings to NaN
@@ -190,13 +155,11 @@ class HumanFeedbackIntegrator:
             how='left'
         )
         
-        # Compute model adaptations
-        model_final_preds = []
-        model_final_confs = []
-        decision_flipped = []
-        flip_reasons = []
-        rule_counts = []
+        # Compute confidence adjustments
+        confidence_adjusted = []
         confidence_gaps = []
+        adjustment_reasons = []
+        rule_counts = []
         
         for _, row in result_df.iterrows():
             self.feedback_stats['total_rows'] += 1
@@ -207,42 +170,33 @@ class HumanFeedbackIntegrator:
             human_conf = row.get('human_confidence', None)
             anomaly_type = row.get('reason', 'unknown')
             
-            # Compute decision flip
-            final_pred, flipped, reason = self.compute_model_final_pred(
+            # Compute confidence adjustment
+            adjusted_conf, adjustment_reason = self.compute_confidence_adjustment(
                 model_pred, model_conf, human_feedback, human_conf
             )
             
-            # Compute final confidence
+            # Calculate confidence gap (only if feedback provided)
             if pd.notna(human_feedback) and pd.notna(human_conf):
-                final_conf = self.compute_final_confidence(
-                    model_conf, model_pred, human_conf, human_feedback, flipped
-                )
+                gap = abs(model_conf - human_conf)
                 self.feedback_stats['with_feedback'] += 1
                 
-                # Track rule override
-                if flipped and anomaly_type not in ['No anomalies detected', 'unknown']:
-                    self.rule_override_counts[anomaly_type] += 1
-                
-                # Confidence gap
-                gap = abs(model_conf - human_conf)
+                # Track rule override (when confidence is significantly reduced)
+                if pd.notna(human_feedback) and human_feedback != model_pred:
+                    if adjusted_conf < (model_conf - 0.15):  # Significant reduction
+                        self.rule_override_counts[anomaly_type] += 1
             else:
-                final_conf = model_conf
                 gap = 0.0
             
-            model_final_preds.append(final_pred)
-            model_final_confs.append(final_conf)
-            decision_flipped.append(flipped)
-            flip_reasons.append(reason)
-            rule_counts.append(self.rule_override_counts.get(anomaly_type, 0))
+            confidence_adjusted.append(adjusted_conf)
             confidence_gaps.append(gap)
+            adjustment_reasons.append(adjustment_reason)
+            rule_counts.append(self.rule_override_counts.get(anomaly_type, 0))
         
         # Add new columns
-        result_df['model_final_pred'] = model_final_preds
-        result_df['model_final_conf'] = model_final_confs
-        result_df['decision_flipped'] = decision_flipped
-        result_df['flip_reason'] = flip_reasons
-        result_df['rule_override_count'] = rule_counts
+        result_df['confidence_adjusted'] = confidence_adjusted
         result_df['confidence_gap'] = confidence_gaps
+        result_df['adjustment_reason'] = adjustment_reasons
+        result_df['rule_override_count'] = rule_counts
         
         return result_df
     
@@ -321,15 +275,20 @@ class HumanFeedbackIntegrator:
         logger.info(f"Rows with human feedback:    {self.feedback_stats['with_feedback']}")
         logger.info(f"  - Agreements:              {self.feedback_stats['agreements']}")
         logger.info(f"  - Disagreements:           {self.feedback_stats['disagreements']}")
-        logger.info(f"  - Decisions flipped:       {self.feedback_stats['decisions_flipped']}")
+        logger.info("")
+        logger.info("NOTE: Model predictions NEVER flip. Confidence adjusts based on feedback.")
+        logger.info("")
         
         if self.feedback_stats['with_feedback'] > 0:
-            flip_rate = self.feedback_stats['decisions_flipped'] / self.feedback_stats['disagreements'] * 100
-            logger.info(f"  - Flip rate on disagreement: {flip_rate:.1f}%")
+            disagreement_rate = self.feedback_stats['disagreements'] / self.feedback_stats['with_feedback'] * 100
+            logger.info(f"Disagreement rate: {disagreement_rate:.1f}%")
         
-        logger.info("\nRule Override Counts:")
-        for rule, count in sorted(self.rule_override_counts.items(), key=lambda x: x[1], reverse=True):
-            logger.info(f"  - {rule}: {count} overrides")
+        logger.info("\nRules with significant confidence reductions:")
+        if self.rule_override_counts:
+            for rule, count in sorted(self.rule_override_counts.items(), key=lambda x: x[1], reverse=True):
+                logger.info(f"  - {rule}: {count} instances")
+        else:
+            logger.info("  (none)")
         logger.info("="*70)
 
 

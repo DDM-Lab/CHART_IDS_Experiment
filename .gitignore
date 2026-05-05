@@ -4,4 +4,5 @@ IDS_tables/*
 IDS_cleaned_tables/*
 IDS_heuristic_model_eval/*
 IDS_with_feedback/*
+TEST_IDS_with_feedback/*
 human_feedback/*
